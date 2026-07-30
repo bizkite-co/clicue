@@ -9,3 +9,10 @@ Setup the initial CLI command structure to accept file paths or piped standard i
 ## Completion Criteria
 
 CLI can run, accept input, and parse the script into a list of words.
+
+## Solution
+
+Implemented argparse CLI in main.py to read from a given script file or stdin, and parsed the content into a list of words.
+
+---
+**Completed in commit:** `140cbe6`
