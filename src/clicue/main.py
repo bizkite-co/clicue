@@ -4,9 +4,10 @@ from rich.live import Live
 
 from clicue.aligner import Aligner
 from clicue.scroller import TUIScroller
-from clicue.listener import STTListener
+from clicue.stt import get_stt_listener
 from clicue.fountain import parse_fountain, ParsedScript
 from clicue.config import load_config
+
 
 def parse_script_from_file(file_obj, raw=False) -> ParsedScript:
     content = file_obj.read()
@@ -66,9 +67,14 @@ def main(args=None):
         help="Log performance metrics to stderr."
     )
     parser.add_argument(
+        "--engine",
+        default="vosk",
+        help="STT engine plugin to use (default: vosk)."
+    )
+    parser.add_argument(
         "--model-path",
         default=None,
-        help="Path to the Vosk model directory."
+        help="Path to the model directory."
     )
     parser.add_argument(
         "--device",
@@ -102,6 +108,7 @@ def main(args=None):
     # Load TOML config and merge with CLI arguments
     cfg = load_config(parsed_args.config)
     
+    engine_name = parsed_args.engine or cfg.get("audio", {}).get("engine", "vosk")
     window_size = parsed_args.window_size or cfg["scroller"]["window_size"]
     past_size = parsed_args.past_size or cfg["scroller"]["past_size"]
     max_lookahead = parsed_args.max_lookahead or cfg["aligner"]["max_lookahead"]
@@ -128,7 +135,8 @@ def main(args=None):
         perf_log=perf_log
     )
     scroller = TUIScroller(script, window_size=window_size, past_size=past_size)
-    listener = STTListener(model_path=model_path, device=device_param)
+    listener = get_stt_listener(engine_name=engine_name, model_path=model_path, device=device_param)
+
     
     audio_stream = listener.listen_file(parsed_args.audio_file) if parsed_args.audio_file else listener.listen()
 

@@ -14,11 +14,11 @@ class TestCLI(unittest.TestCase):
         words = main.parse_words_from_file(fake_file)
         self.assertEqual(words, ["This", "is", "a", "test", "script", "with", "some", "words."])
 
-    @patch('clicue.main.STTListener')
-    def test_main_with_file_argument(self, mock_listener_class):
+    @patch('clicue.main.get_stt_listener')
+    def test_main_with_file_argument(self, mock_get_stt_listener):
         mock_listener = MagicMock()
         mock_listener.listen.return_value = ["mocked text"]
-        mock_listener_class.return_value = mock_listener
+        mock_get_stt_listener.return_value = mock_listener
         
         # Create a temporary file
         import tempfile
@@ -35,17 +35,18 @@ class TestCLI(unittest.TestCase):
         finally:
             os.remove(temp_path)
 
-    @patch('clicue.main.STTListener')
+    @patch('clicue.main.get_stt_listener')
     @patch('sys.stdin', new_callable=lambda: io.StringIO("stdin input text"))
-    def test_main_with_stdin(self, mock_stdin, mock_listener_class):
+    def test_main_with_stdin(self, mock_stdin, mock_get_stt_listener):
         mock_listener = MagicMock()
         mock_listener.listen.return_value = [] # Immediately stop
-        mock_listener_class.return_value = mock_listener
+        mock_get_stt_listener.return_value = mock_listener
 
         with patch('sys.stdout', new=io.StringIO()):
             result = main.main([])
             
         self.assertEqual(result, 0)
+
 
 
 if __name__ == '__main__':
