@@ -4,7 +4,7 @@ version = "0.1.0"
 description = "Add your description here"
 readme = "README.md"
 requires-python = ">=3.12"
-dependencies = ["rapidfuzz", "vosk", "sounddevice"]
+dependencies = ["rapidfuzz", "vosk", "sounddevice", "rich"]
 
 [project.scripts]
 clicue = "clicue.main:main"
