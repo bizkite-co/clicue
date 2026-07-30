@@ -10,3 +10,10 @@ Combine the CLI, STT, fuzzy matching, and TUI into a cohesive running applicatio
 ## Completion Criteria
 
 The user can run `clicue script.txt`, read the text aloud, and watch the window shift perfectly.
+
+## Solution
+
+Integrated Aligner, STTListener, and TUIScroller in src/clicue/main.py. Mocked STTListener in test_main.py to prevent blocking the test suite.
+
+---
+**Completed in commit:** `371f62f`
