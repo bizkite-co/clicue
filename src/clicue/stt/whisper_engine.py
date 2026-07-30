@@ -17,17 +17,22 @@ from clicue.stt.base import BaseSTTListener
 
 
 class WhisperSTTListener(BaseSTTListener):
-    def __init__(self, model_path="base.en", sample_rate=16000, device=None, compute_type="int8"):
+    def __init__(self, model_path="base.en", sample_rate=16000, device=None, compute_type="int8", hf_token=None):
         self.sample_rate = sample_rate
         self.device_id = device
         self.model_name = model_path if model_path and model_path != "model" else "base.en"
+        token = hf_token or os.environ.get("HF_TOKEN")
         
         try:
             # Load Whisper model (int8 quantization for lightning-fast CPU inference)
-            self.model = WhisperModel(self.model_name, device="cpu", compute_type=compute_type)
+            kwargs = {}
+            if token:
+                kwargs["auth_token"] = token
+            self.model = WhisperModel(self.model_name, device="cpu", compute_type=compute_type, **kwargs)
         except Exception as e:
             print(f"Error loading Faster-Whisper model '{self.model_name}': {e}", file=sys.stderr)
             sys.exit(1)
+
 
         self.q = queue.Queue()
 
