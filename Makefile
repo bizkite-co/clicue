@@ -7,3 +7,8 @@ help: ## Display this help screen
 # ==============================================================================
 # Application Tasks
 # ==============================================================================
+
+.PHONY: test
+test: ## Run all unit tests
+	uv run python3 -m unittest discover tests
+

@@ -9,3 +9,10 @@ Create an alignment engine using rapidfuzz that takes the script words and incom
 ## Completion Criteria
 
 Given a stream of slightly imperfect STT text, the engine correctly advances the word index in the original script.
+
+## Solution
+
+Implemented Aligner class in src/clicue/aligner.py using rapidfuzz, and added unit tests in tests/test_aligner.py.
+
+---
+**Completed in commit:** `8a57b4e`
