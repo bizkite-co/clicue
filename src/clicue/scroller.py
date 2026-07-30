@@ -27,74 +27,78 @@ class TUIScroller:
             self.para_starts_indices = [0]
 
     def _get_current_para_index(self, current_index: int) -> int:
-        """Finds the paragraph index containing current_index."""
         for p_idx in range(len(self.para_starts_indices) - 1, -1, -1):
             if self.para_starts_indices[p_idx] <= current_index:
                 return p_idx
         return 0
 
-    def render(self, current_index: int) -> Group:
+    def render(self, current_index: int, is_paused: bool = False) -> Group:
         """
-        Renders the TUI layout without reflow:
-        - Header: Clean yellow stage cue description (no redundant CUE: [Screen Recording:)
-        - Body: Anchored at paragraph boundaries to prevent word-wrapping reflow while reading.
+        Renders the TUI layout with player controls status bar:
+        - Top Header: Player state ([TRACKING ▶] or [PAUSED ⏸]), stage cue, and hotkey guide.
+        - Text Body: Anchored at paragraph boundaries for zero-reflow teleprompter viewing.
         """
         current_index = max(0, min(current_index, len(self.script) - 1)) if len(self.script) > 0 else 0
         
-        # 1. Clean Cue Status Bar (in yellow, no redundant labels or trailing brackets)
-        active_cue = self.script.cues[current_index] if len(self.script.cues) > current_index else ""
-        
+        # 1. Player Controls & Stage Cue Header
         header_text = Text()
+
+        if is_paused:
+            header_text.append("[PAUSED ⏸] ", style="bold black on yellow")
+        else:
+            header_text.append("[TRACKING ▶] ", style="bold white on green")
+
+        active_cue = self.script.cues[current_index] if len(self.script.cues) > current_index else ""
         if active_cue:
-            header_text.append("🎬 ", style="yellow")
+            header_text.append(" 🎬 ", style="yellow")
             header_text.append(active_cue, style="bold yellow")
         else:
-            header_text.append("🎬 ", style="dim yellow")
+            header_text.append(" 🎬 ", style="dim yellow")
             header_text.append("(no active cue)", style="dim yellow")
+
+        # Hotkey Help Bar
+        footer_help = Text()
+        footer_help.append("[Space]: Pause/Resume  |  [← / b]: Rewind 5w  |  [→ / f]: Skip 5w  |  [q]: Quit", style="dim cyan")
 
         # 2. Text Body with Paragraph-Anchored Stationary Layout
         p_idx = self._get_current_para_index(current_index)
-
-        # Anchor start_index at the beginning of the previous paragraph (or current paragraph if at start)
-        # This keeps start_index FIXED while reading through the current paragraph!
         prev_p_idx = max(0, p_idx - 1)
         start_index = self.para_starts_indices[prev_p_idx]
 
-        # End index covers current paragraph + upcoming paragraphs (up to window_size)
-        end_index = min(start_index + max(self.window_size + self.past_size, current_index - start_index + self.window_size), len(self.script.words))
+        end_index = min(
+            start_index + max(self.window_size + self.past_size, current_index - start_index + self.window_size),
+            len(self.script.words)
+        )
 
         body_text = Text()
 
         for idx in range(start_index, end_index):
             word = self.script.words[idx]
 
-            # Paragraph break spacing
             if idx > start_index and self.script.para_starts[idx]:
                 body_text.append("\n\n")
 
             if idx < current_index:
-                # Read past words (dimmed 50% style)
                 body_text.append(word, style="dim white")
             elif idx == current_index:
-                # Active current word
                 body_text.append(word, style="bold bright_green")
             else:
-                # Upcoming words
                 body_text.append(word, style="white")
 
             body_text.append(" ")
 
         return Group(
-            Padding(header_text, (0, 0, 1, 0)),
+            Padding(header_text, (0, 0, 0, 0)),
+            Padding(footer_help, (0, 0, 1, 0)),
             Padding(body_text, (0, 0, 0, 0))
         )
 
-    def render_text(self, current_index: int):
-        return self.render(current_index)
+    def render_text(self, current_index: int, is_paused: bool = False):
+        return self.render(current_index, is_paused=is_paused)
 
-    def display(self, current_index: int):
+    def display(self, current_index: int, is_paused: bool = False):
         self.console.clear()
-        self.console.print(self.render(current_index))
+        self.console.print(self.render(current_index, is_paused=is_paused))
 
 if __name__ == "__main__":
     import time

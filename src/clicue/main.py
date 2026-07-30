@@ -23,6 +23,49 @@ def parse_script_from_file(file_obj, raw=False) -> ParsedScript:
 def parse_words_from_file(file_obj, raw=False):
     return parse_script_from_file(file_obj, raw).words
 
+import select
+import termios
+import tty
+
+class KeyboardListener:
+    def __enter__(self):
+        self.old_settings = None
+        if sys.stdin.isatty():
+            try:
+                self.old_settings = termios.tcgetattr(sys.stdin)
+                tty.setcbreak(sys.stdin.fileno())
+            except Exception:
+                pass
+        return self
+
+    def __exit__(self, type, value, traceback):
+        if self.old_settings and sys.stdin.isatty():
+            try:
+                termios.tcsetattr(sys.stdin, termios.TCSADRAIN, self.old_settings)
+            except Exception:
+                pass
+
+    def get_key(self) -> str | None:
+        if not sys.stdin.isatty():
+            return None
+        dr, _, _ = select.select([sys.stdin], [], [], 0)
+        if dr:
+            ch = sys.stdin.read(1)
+            if ch == '\x1b':
+                dr2, _, _ = select.select([sys.stdin], [], [], 0.01)
+                if dr2:
+                    ch2 = sys.stdin.read(1)
+                    if ch2 == '[':
+                        dr3, _, _ = select.select([sys.stdin], [], [], 0.01)
+                        if dr3:
+                            ch3 = sys.stdin.read(1)
+                            if ch3 == 'D':
+                                return 'LEFT'
+                            elif ch3 == 'C':
+                                return 'RIGHT'
+            return ch
+        return None
+
 def main(args=None):
     parser = argparse.ArgumentParser(description="clicue - teleprompter script scroller")
     parser.add_argument(
@@ -136,27 +179,46 @@ def main(args=None):
     )
     scroller = TUIScroller(script, window_size=window_size, past_size=past_size)
     listener = get_stt_listener(engine_name=engine_name, model_path=model_path, device=device_param)
-
     
     audio_stream = listener.listen_file(parsed_args.audio_file) if parsed_args.audio_file else listener.listen()
 
     current_idx = 0
+    is_paused = False
+
     try:
-        with Live(scroller.render(0), refresh_per_second=15, auto_refresh=False, screen=True) as live:
-            for text in audio_stream:
-                new_idx = aligner.advance(text)
-                if new_idx != current_idx:
-                    current_idx = new_idx
-                    live.update(scroller.render(current_idx), refresh=True)
-                if current_idx >= len(script.words):
-                    break
+        with KeyboardListener() as kbd:
+            with Live(scroller.render(0, is_paused=False), refresh_per_second=15, auto_refresh=False, screen=True) as live:
+                for text in audio_stream:
+                    # Check non-blocking hotkey input
+                    key = kbd.get_key()
+                    if key in (' ', 'p'):
+                        is_paused = not is_paused
+                        live.update(scroller.render(current_idx, is_paused=is_paused), refresh=True)
+                    elif key in ('LEFT', 'b'):
+                        current_idx = max(0, current_idx - 5)
+                        aligner.current_index = current_idx
+                        live.update(scroller.render(current_idx, is_paused=is_paused), refresh=True)
+                    elif key in ('RIGHT', 'f'):
+                        current_idx = min(len(script.words) - 1, current_idx + 5)
+                        aligner.current_index = current_idx
+                        live.update(scroller.render(current_idx, is_paused=is_paused), refresh=True)
+                    elif key == 'q':
+                        break
+
+                    # Advance cursor with STT only if not paused
+                    if not is_paused:
+                        new_idx = aligner.advance(text)
+                        if new_idx != current_idx:
+                            current_idx = new_idx
+                            live.update(scroller.render(current_idx, is_paused=is_paused), refresh=True)
+
+                    if current_idx >= len(script.words):
+                        break
     except KeyboardInterrupt:
         pass
 
     return 0
 
-
-
-
 if __name__ == "__main__":
     main()
+
