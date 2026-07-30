@@ -112,12 +112,17 @@ def main(args=None):
     parser.add_argument(
         "--engine",
         default="vosk",
-        help="STT engine plugin to use (default: vosk)."
+        help="STT engine plugin to use (e.g. 'vosk', 'whisper'). Default: vosk."
+    )
+    parser.add_argument(
+        "--whisper",
+        action="store_true",
+        help="Shortcut to use the Faster-Whisper neural STT engine."
     )
     parser.add_argument(
         "--model",
         default=None,
-        help="Model name shortcut (e.g. 'vosk-full', 'vosk-small') or folder path."
+        help="Model name shortcut (e.g. 'vosk-full', 'vosk-small', 'base.en', 'tiny.en') or folder path."
     )
     parser.add_argument(
         "--vosk-full",
@@ -166,7 +171,7 @@ def main(args=None):
     # Load TOML config and merge with CLI arguments
     cfg = load_config(parsed_args.config)
     
-    engine_name = parsed_args.engine or cfg.get("audio", {}).get("engine", "vosk")
+    engine_name = "whisper" if parsed_args.whisper else (parsed_args.engine or cfg.get("audio", {}).get("engine", "vosk"))
     window_size = parsed_args.window_size or cfg["scroller"]["window_size"]
     past_size = parsed_args.past_size or cfg["scroller"]["past_size"]
     max_lookahead = parsed_args.max_lookahead or cfg["aligner"]["max_lookahead"]
@@ -176,7 +181,9 @@ def main(args=None):
 
     # Determine model shortcut / path
     model_input = None
-    if parsed_args.vosk_full:
+    if parsed_args.whisper:
+        model_input = parsed_args.model or "base.en"
+    elif parsed_args.vosk_full:
         model_input = "vosk-full"
     elif parsed_args.vosk_small:
         model_input = "vosk-small"
@@ -187,7 +194,11 @@ def main(args=None):
     else:
         model_input = cfg.get("audio", {}).get("model", cfg.get("audio", {}).get("model_path", "vosk-small"))
 
-    model_path = resolve_model_path(model_input)
+    if engine_name.lower() in ("whisper", "faster-whisper"):
+        model_path = model_input
+    else:
+        model_path = resolve_model_path(model_input)
+
 
     script = parse_script_from_file(parsed_args.script, raw=parsed_args.raw)
     
