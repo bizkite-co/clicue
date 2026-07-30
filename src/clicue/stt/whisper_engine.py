@@ -1,10 +1,20 @@
+import logging
+import os
 import queue
 import sys
 import time
+import warnings
+
+# Suppress HuggingFace Hub unauthenticated request warnings
+os.environ["HF_HUB_DISABLE_SYMLINKS_WARNING"] = "1"
+logging.getLogger("huggingface_hub").setLevel(logging.ERROR)
+warnings.filterwarnings("ignore", module="huggingface_hub")
+
 import numpy as np
 import sounddevice as sd
 from faster_whisper import WhisperModel
 from clicue.stt.base import BaseSTTListener
+
 
 class WhisperSTTListener(BaseSTTListener):
     def __init__(self, model_path="base.en", sample_rate=16000, device=None, compute_type="int8"):
