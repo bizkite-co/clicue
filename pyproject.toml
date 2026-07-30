@@ -1,6 +1,7 @@
 [project]
 name = "clicue"
-version = "0.1.0"
+version = "0.1.1"
+
 description = "Add your description here"
 readme = "README.md"
 requires-python = ">=3.12"
@@ -12,3 +13,10 @@ clicue = "clicue.main:main"
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.sdist]
+only-include = ["src/clicue", "README.md", "pyproject.toml"]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/clicue"]
+
