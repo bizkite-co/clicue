@@ -7,7 +7,7 @@ from clicue.scroller import TUIScroller
 from clicue.stt import get_stt_listener
 from clicue.fountain import parse_fountain, ParsedScript
 from clicue.config import load_config
-
+from clicue.models import resolve_model_path
 
 def parse_script_from_file(file_obj, raw=False) -> ParsedScript:
     content = file_obj.read()
@@ -115,9 +115,24 @@ def main(args=None):
         help="STT engine plugin to use (default: vosk)."
     )
     parser.add_argument(
+        "--model",
+        default=None,
+        help="Model name shortcut (e.g. 'vosk-full', 'vosk-small') or folder path."
+    )
+    parser.add_argument(
+        "--vosk-full",
+        action="store_true",
+        help="Shortcut to use the full 1.8GB Vosk model (vosk-full)."
+    )
+    parser.add_argument(
+        "--vosk-small",
+        action="store_true",
+        help="Shortcut to use the compact Vosk model (vosk-small)."
+    )
+    parser.add_argument(
         "--model-path",
         default=None,
-        help="Path to the model directory."
+        help="Legacy option: Path to the model directory."
     )
     parser.add_argument(
         "--device",
@@ -157,8 +172,22 @@ def main(args=None):
     max_lookahead = parsed_args.max_lookahead or cfg["aligner"]["max_lookahead"]
     threshold = parsed_args.threshold or cfg["aligner"]["threshold"]
     locality_penalty = cfg["aligner"].get("locality_penalty", 1.5)
-    model_path = parsed_args.model_path or cfg["audio"]["model_path"]
     perf_log = parsed_args.perf_log or cfg["debug"]["perf_log"]
+
+    # Determine model shortcut / path
+    model_input = None
+    if parsed_args.vosk_full:
+        model_input = "vosk-full"
+    elif parsed_args.vosk_small:
+        model_input = "vosk-small"
+    elif parsed_args.model:
+        model_input = parsed_args.model
+    elif parsed_args.model_path:
+        model_input = parsed_args.model_path
+    else:
+        model_input = cfg.get("audio", {}).get("model", cfg.get("audio", {}).get("model_path", "vosk-small"))
+
+    model_path = resolve_model_path(model_input)
 
     script = parse_script_from_file(parsed_args.script, raw=parsed_args.raw)
     
@@ -179,6 +208,7 @@ def main(args=None):
     )
     scroller = TUIScroller(script, window_size=window_size, past_size=past_size)
     listener = get_stt_listener(engine_name=engine_name, model_path=model_path, device=device_param)
+
     
     audio_stream = listener.listen_file(parsed_args.audio_file) if parsed_args.audio_file else listener.listen()
 
