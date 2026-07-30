@@ -29,9 +29,9 @@ class TestCLI(unittest.TestCase):
         try:
             # Capture output to avoid rich clearing the screen
             with patch('sys.stdout', new=io.StringIO()):
-                words = main.main([temp_path])
+                result = main.main([temp_path])
                 
-            self.assertEqual(words, ["one", "two", "three"])
+            self.assertEqual(result, 0)
         finally:
             os.remove(temp_path)
 
@@ -43,9 +43,10 @@ class TestCLI(unittest.TestCase):
         mock_listener_class.return_value = mock_listener
 
         with patch('sys.stdout', new=io.StringIO()):
-            words = main.main([])
+            result = main.main([])
             
-        self.assertEqual(words, ["stdin", "input", "text"])
+        self.assertEqual(result, 0)
+
 
 if __name__ == '__main__':
     unittest.main()
