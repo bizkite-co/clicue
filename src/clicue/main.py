@@ -9,6 +9,14 @@ from clicue.fountain import parse_fountain, ParsedScript
 from clicue.config import load_config
 from clicue.models import resolve_model_path
 
+from importlib.metadata import version as get_meta_version, PackageNotFoundError
+
+def get_version() -> str:
+    try:
+        return get_meta_version("clicue")
+    except PackageNotFoundError:
+        return "0.1.11"
+
 def parse_script_from_file(file_obj, raw=False) -> ParsedScript:
     content = file_obj.read()
     if raw:
@@ -67,7 +75,22 @@ class KeyboardListener:
         return None
 
 def main(args=None):
+    if args is None:
+        args = sys.argv[1:]
+
+    # Support positional 'version' or 'v' subcommand
+    if args and args[0].lower() in ("version", "v"):
+        print(f"clicue v{get_version()}")
+        return 0
+
     parser = argparse.ArgumentParser(description="clicue - teleprompter script scroller")
+    parser.add_argument(
+        "--version",
+        "-V",
+        action="version",
+        version=f"clicue v{get_version()}",
+        help="Show clicue version and exit."
+    )
     parser.add_argument(
         "script",
         nargs="?",
@@ -75,6 +98,7 @@ def main(args=None):
         default=sys.stdin,
         help="Path to the script file (or '-' for stdin). If omitted, reads from stdin.",
     )
+
     parser.add_argument(
         "--config",
         default=None,
