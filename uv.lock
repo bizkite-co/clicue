@@ -210,7 +210,7 @@ wheels = [
 
 [[package]]
 name = "clicue"
-version = "0.1.13"
+version = "0.1.14"
 source = { editable = "." }
 dependencies = [
     { name = "faster-whisper" },
@@ -218,6 +218,11 @@ dependencies = [
     { name = "rich" },
     { name = "sounddevice" },
     { name = "vosk" },
+]
+
+[package.dev-dependencies]
+dev = [
+    { name = "verkit" },
 ]
 
 [package.metadata]
@@ -228,6 +233,9 @@ requires-dist = [
     { name = "sounddevice" },
     { name = "vosk" },
 ]
+
+[package.metadata.requires-dev]
+dev = [{ name = "verkit", specifier = ">=0.1.4" }]
 
 [[package]]
 name = "colorama"
@@ -771,6 +779,18 @@ source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/53/0c/06f8b233b8fd13b9e5ee11424ef85419ba0d8ba0b3138bf360be2ff56953/urllib3-2.7.0.tar.gz", hash = "sha256:231e0ec3b63ceb14667c67be60f2f2c40a518cb38b03af60abc813da26505f4c", size = 433602, upload-time = "2026-05-07T16:13:18.596Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/7f/3e/5db95bcf282c52709639744ca2a8b149baccf648e39c8cc87553df9eae0c/urllib3-2.7.0-py3-none-any.whl", hash = "sha256:9fb4c81ebbb1ce9531cce37674bbc6f1360472bc18ca9a553ede278ef7276897", size = 131087, upload-time = "2026-05-07T16:13:17.151Z" },
+]
+
+[[package]]
+name = "verkit"
+version = "0.1.4"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "rich" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/a8/68/70d0727c0feff38a35881f0db362c93ebdf6dc4b14b024b3b4434f1795de/verkit-0.1.4.tar.gz", hash = "sha256:2ec6bf18124736783517c16858ac3799a21ba89e4fcc324a3ad22930c0b52cc8", size = 9034, upload-time = "2026-07-31T14:56:38.01Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/d2/ee/6eadd91f262d01b316722e768b549248b1a660ac20029b67bc2dc2e97bf0/verkit-0.1.4-py3-none-any.whl", hash = "sha256:bce42636d1bfb22e20e63bfccf74df8349836c17930ef1c3d3bd836e7a170cbb", size = 9149, upload-time = "2026-07-31T14:56:36.889Z" },
 ]
 
 [[package]]
