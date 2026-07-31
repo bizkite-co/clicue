@@ -25,5 +25,14 @@ I wanted an easy way to look at the next step.
         ]
         self.assertEqual(words, expected)
 
+    def test_emphasis_parsing(self):
+        from clicue.fountain import parse_fountain
+        fountain_content = "This is *italic* and **bold** and _italic_ text."
+        parsed = parse_fountain(fountain_content)
+        self.assertEqual(parsed.words, ["This", "is", "italic", "and", "bold", "and", "italic", "text."])
+        self.assertEqual(parsed.styles, ["", "", "italic", "", "bold", "", "italic", ""])
+
+
+
 if __name__ == '__main__':
     unittest.main()

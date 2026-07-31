@@ -110,15 +110,18 @@ class TUIScroller:
 
             for word_idx in line:
                 word = self.script.words[word_idx]
+                word_style = self.script.styles[word_idx] if hasattr(self.script, "styles") and len(self.script.styles) > word_idx else ""
 
                 if word_idx < current_index:
-                    body_text.append(word, style="dim white")
+                    style_str = f"dim white {word_style}".strip()
                 elif word_idx == current_index:
-                    body_text.append(word, style="bold bright_green")
+                    style_str = f"bold bright_green {word_style}".strip()
                 else:
-                    body_text.append(word, style="white")
+                    style_str = f"white {word_style}".strip()
 
+                body_text.append(word, style=style_str)
                 body_text.append(" ")
+
 
         return Group(
             Padding(header_text, (0, 0, 1, 0)),

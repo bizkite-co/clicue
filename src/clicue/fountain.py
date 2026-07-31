@@ -3,10 +3,11 @@ import re
 HEADER_KEYWORDS = {"title:", "author:", "authors:", "draft date:", "date:", "contact:", "copyright:", "notes:"}
 
 class ParsedScript:
-    def __init__(self, words: list[str], cues: list[str], para_starts: list[bool]):
+    def __init__(self, words: list[str], cues: list[str], para_starts: list[bool], styles: list[str] = None):
         self.words = words
         self.cues = cues
         self.para_starts = para_starts
+        self.styles = styles if styles is not None else [""] * len(words)
 
     def __len__(self):
         return len(self.words)
@@ -27,17 +28,39 @@ def is_character_name(line: str) -> bool:
         return True
     return False
 
+def parse_emphasis_word(raw_word: str) -> tuple[str, str]:
+    """
+    Parses Markdown/Fountain emphasis delimiters (*word*, _word_, **word**)
+    and returns (clean_word, rich_style_string).
+    """
+    # Match emphasis delimiters (*, _, **, __, ***, ___) around a word
+    m = re.match(r"^([^\w\*\_]*)([\*\_]+)(.*?)([\*\_]+)([^\w\*\_]*)$", raw_word)
+    if m:
+        prefix, start_delim, core, end_delim, suffix = m.groups()
+        if core:
+            clean = f"{prefix}{core}{suffix}"
+            delim_len = min(len(start_delim), len(end_delim))
+            if delim_len >= 3:
+                return clean, "bold italic"
+            elif delim_len == 2:
+                return clean, "bold"
+            else:
+                return clean, "italic"
+
+    return raw_word, ""
+
 def parse_fountain(content: str) -> ParsedScript:
     """
     Parses Fountain or markdown script content.
-    Extracts spoken dialogue words while tracking active stage cues ([Screen Recording...])
-    and paragraph boundaries for teleprompter formatting.
+    Extracts spoken dialogue words, emphasis styles (*italic*, _underline_),
+    active stage cues ([Screen Recording...]), and paragraph boundaries.
     """
     lines = content.splitlines()
     
     words = []
     cues = []
     para_starts = []
+    styles = []
 
     current_cue = ""
     in_header = True
@@ -61,7 +84,6 @@ def parse_fountain(content: str) -> ParsedScript:
         bracket_cues = re.findall(r"\[(.*?)\]", line)
         if bracket_cues:
             raw_cue = bracket_cues[-1].strip()
-            # Strip redundant prefixes like "Screen Recording:", "Visual:", etc.
             clean_cue = re.sub(r"^(Screen Recording|Visual|Audio|Note|Action):\s*", "", raw_cue, flags=re.IGNORECASE)
             current_cue = clean_cue
 
@@ -77,15 +99,16 @@ def parse_fountain(content: str) -> ParsedScript:
 
         if line_clean:
             line_words = line_clean.split()
-            for i, w in enumerate(line_words):
-                words.append(w)
+            for i, raw_w in enumerate(line_words):
+                clean_w, word_style = parse_emphasis_word(raw_w)
+                words.append(clean_w)
+                styles.append(word_style)
                 cues.append(current_cue)
-                # First word of a line/paragraph gets the paragraph start flag
                 para_starts.append(next_is_para_start and (i == 0))
             
             next_is_para_start = False
 
-    return ParsedScript(words=words, cues=cues, para_starts=para_starts)
+    return ParsedScript(words=words, cues=cues, para_starts=para_starts, styles=styles)
 
 def parse_fountain_words(content: str) -> list[str]:
     return parse_fountain(content).words
