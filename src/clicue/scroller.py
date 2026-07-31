@@ -19,35 +19,59 @@ class TUIScroller:
         self.past_size = past_size
         self.console = Console()
 
-        # Precompute paragraph start word indices
-        self.para_starts_indices = [
-            i for i, is_start in enumerate(self.script.para_starts) if is_start
-        ]
-        if not self.para_starts_indices:
-            self.para_starts_indices = [0]
+    def _build_wrapped_lines(self, width: int):
+        """
+        Groups script word indices into terminal line rows based on column width
+        and paragraph breaks.
+        Returns a list of lists of word indices, e.g. [[0, 1, 2], [3, 4], ...]
+        """
+        lines = []
+        current_line = []
+        current_length = 0
 
-    def _get_current_para_index(self, current_index: int) -> int:
-        for p_idx in range(len(self.para_starts_indices) - 1, -1, -1):
-            if self.para_starts_indices[p_idx] <= current_index:
-                return p_idx
-        return 0
+        for idx, word in enumerate(self.script.words):
+            is_para_start = self.script.para_starts[idx]
+            word_len = len(word) + 1  # word + trailing space
+
+            # If paragraph start (and not first word of script), start a new paragraph line
+            if is_para_start and idx > 0:
+                if current_line:
+                    lines.append(current_line)
+                    current_line = []
+                    current_length = 0
+                # Add empty line for paragraph spacing
+                lines.append([])
+
+            # If adding word exceeds terminal width, wrap to next line
+            if current_line and (current_length + word_len > width):
+                lines.append(current_line)
+                current_line = [idx]
+                current_length = word_len
+            else:
+                current_line.append(idx)
+                current_length += word_len
+
+        if current_line:
+            lines.append(current_line)
+
+        return lines
 
     def render(self, current_index: int, is_paused: bool = False) -> Group:
         """
-        Renders the TUI layout with player controls status bar:
-        - Top Header: Player state ([TRACKING ▶] or [PAUSED ⏸]), stage cue, and hotkey guide.
-        - Text Body: Anchored at paragraph boundaries for zero-reflow teleprompter viewing.
+        Renders the TUI layout:
+        - Header: Status badge ([CLICUE TRACKING ▶] or [CLICUE PAUSED ⏸]) and active stage cue.
+        - Text Body: Line-anchored to display strictly 1 previous row of text at top,
+          maximizing upcoming line visibility with zero reflow.
         """
         current_index = max(0, min(current_index, len(self.script) - 1)) if len(self.script) > 0 else 0
         
-        # 1. Player Controls & Stage Cue Header
+        # 1. Header (Status Badge + Stage Cue)
         header_text = Text()
 
         if is_paused:
             header_text.append("[CLICUE PAUSED ⏸] ", style="bold black on yellow")
         else:
             header_text.append("[CLICUE TRACKING ▶] ", style="bold white on green")
-
 
         active_cue = self.script.cues[current_index] if len(self.script.cues) > current_index else ""
         if active_cue:
@@ -57,40 +81,47 @@ class TUIScroller:
             header_text.append(" 🎬 ", style="dim yellow")
             header_text.append("(no active cue)", style="dim yellow")
 
-        # Hotkey Help Bar
-        footer_help = Text()
-        footer_help.append("[Space]: Pause/Resume  |  [← / b]: Rewind 5w  |  [→ / f]: Skip 5w  |  [q]: Quit", style="dim cyan")
+        # 2. Line-Anchored Text Body (1 previous row max context)
+        width = max(40, self.console.width - 2)
+        height = max(10, self.console.height - 3)
 
-        # 2. Text Body with Paragraph-Anchored Stationary Layout
-        p_idx = self._get_current_para_index(current_index)
-        start_index = self.para_starts_indices[p_idx]
+        lines = self._build_wrapped_lines(width)
 
+        # Find line containing current_index
+        active_line_idx = 0
+        for l_idx, line in enumerate(lines):
+            if current_index in line:
+                active_line_idx = l_idx
+                break
 
-        end_index = min(
-            start_index + max(self.window_size + self.past_size, current_index - start_index + self.window_size),
-            len(self.script.words)
-        )
+        # Show exactly 1 previous line of context above active line (if available)
+        top_line_idx = max(0, active_line_idx - 1)
+        visible_lines = lines[top_line_idx : top_line_idx + height]
 
         body_text = Text()
 
-        for idx in range(start_index, end_index):
-            word = self.script.words[idx]
+        for l_idx, line in enumerate(visible_lines):
+            if l_idx > 0:
+                body_text.append("\n")
 
-            if idx > start_index and self.script.para_starts[idx]:
-                body_text.append("\n\n")
+            if not line:
+                # Empty line for paragraph spacing
+                continue
 
-            if idx < current_index:
-                body_text.append(word, style="dim white")
-            elif idx == current_index:
-                body_text.append(word, style="bold bright_green")
-            else:
-                body_text.append(word, style="white")
+            for word_idx in line:
+                word = self.script.words[word_idx]
 
-            body_text.append(" ")
+                if word_idx < current_index:
+                    body_text.append(word, style="dim white")
+                elif word_idx == current_index:
+                    body_text.append(word, style="bold bright_green")
+                else:
+                    body_text.append(word, style="white")
+
+                body_text.append(" ")
 
         return Group(
-            Padding(header_text, (0, 0, 0, 0)),
-            Padding(footer_help, (0, 0, 1, 0)),
+            Padding(header_text, (0, 0, 1, 0)),
             Padding(body_text, (0, 0, 0, 0))
         )
 
