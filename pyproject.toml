@@ -1,15 +1,6 @@
 [project]
 name = "clicue"
-version = "0.1.12"
-
-
-
-
-
-
-
-
-
+version = "0.1.13"
 
 description = "Add your description here"
 readme = "README.md"
@@ -29,3 +20,7 @@ only-include = ["src/clicue", "README.md", "pyproject.toml"]
 [tool.hatch.build.targets.wheel]
 packages = ["src/clicue"]
 
+[dependency-groups]
+dev = [
+    "verkit",
+]
