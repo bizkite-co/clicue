@@ -63,8 +63,8 @@ class TUIScroller:
 
         # 2. Text Body with Paragraph-Anchored Stationary Layout
         p_idx = self._get_current_para_index(current_index)
-        prev_p_idx = max(0, p_idx - 1)
-        start_index = self.para_starts_indices[prev_p_idx]
+        start_index = self.para_starts_indices[p_idx]
+
 
         end_index = min(
             start_index + max(self.window_size + self.past_size, current_index - start_index + self.window_size),
