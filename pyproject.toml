@@ -1,6 +1,6 @@
 [project]
 name = "clicue"
-version = "0.1.15"
+version = "0.1.16"
 
 description = "Add your description here"
 readme = "README.md"
@@ -22,6 +22,7 @@ packages = ["src/clicue"]
 
 [dependency-groups]
 dev = [
-    "verkit>=0.1.4",
+    "verkit",
 ]
+
 
