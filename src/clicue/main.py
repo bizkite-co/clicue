@@ -9,13 +9,49 @@ from clicue.fountain import parse_fountain, ParsedScript
 from clicue.config import load_config
 from clicue.models import resolve_model_path
 
+import urllib.request
+import json
+import pathlib
+import re
 from importlib.metadata import version as get_meta_version, PackageNotFoundError
 
-def get_version() -> str:
+def get_running_version() -> str:
     try:
         return get_meta_version("clicue")
     except PackageNotFoundError:
-        return "0.1.11"
+        return get_local_project_version() or "0.1.14"
+
+def get_pypi_version(running_ver: str) -> tuple[str | None, str]:
+    try:
+        req = urllib.request.Request(
+            "https://pypi.org/pypi/clicue/json",
+            headers={"User-Agent": "clicue-cli"}
+        )
+        with urllib.request.urlopen(req, timeout=1.5) as resp:
+            data = json.loads(resp.read().decode())
+            latest = data.get("info", {}).get("version", "")
+            if latest:
+                if latest == running_ver:
+                    return latest, "up to date"
+                else:
+                    return latest, f"upgrade available: v{latest}"
+    except Exception:
+        pass
+    return None, "offline"
+
+def get_local_project_version() -> str | None:
+    try:
+        pyproject_path = pathlib.Path("pyproject.toml")
+        if pyproject_path.exists():
+            content = pyproject_path.read_text(encoding="utf-8")
+            match = re.search(r'^version\s*=\s*["\']([^"\']+)["\']', content, re.MULTILINE)
+            if match:
+                return match.group(1)
+    except Exception:
+        pass
+    return None
+
+get_version = get_running_version
 
 def parse_script_from_file(file_obj, raw=False) -> ParsedScript:
     content = file_obj.read()
@@ -31,6 +67,30 @@ def parse_script_from_file(file_obj, raw=False) -> ParsedScript:
 def parse_words_from_file(file_obj, raw=False):
     return parse_script_from_file(file_obj, raw).words
 
+from rich.console import Console
+
+def print_version_details():
+    console = Console()
+    running_ver = get_running_version()
+    
+    # 1. Running version
+    console.print(f"[bold blue]Running version:[/bold blue] {running_ver}")
+    
+    # 2. PyPI version
+    pypi_ver, status = get_pypi_version(running_ver)
+    if pypi_ver:
+        if status == "up to date":
+            status_markup = "[green](up to date)[/green]"
+        else:
+            status_markup = f"[yellow]({status})[/yellow]"
+        console.print(f"[dim]Latest PyPI version:[/dim] {pypi_ver} {status_markup}")
+    else:
+        console.print("[dim]Latest PyPI version:[/dim] [dim red]unknown (offline)[/dim red]")
+
+    # 3. Local project version
+    local_ver = get_local_project_version()
+    if local_ver:
+        console.print(f"[dim]Local project version:[/dim] {local_ver} (from pyproject.toml)")
 import select
 import termios
 import tty
@@ -75,13 +135,32 @@ class KeyboardListener:
         return None
 
 def main(args=None):
+
     if args is None:
         args = sys.argv[1:]
 
     # Support positional 'version' or 'v' subcommand
     if args and args[0].lower() in ("version", "v"):
-        print(f"clicue v{get_version()}")
-        return 0
+        sub_args = args[1:]
+        if not sub_args:
+            print_version_details()
+            return 0
+        else:
+            import subprocess
+            import shutil
+            if shutil.which("uvx"):
+                res = subprocess.run(["uvx", "verkit@latest"] + sub_args)
+                return res.returncode
+            else:
+                try:
+                    res = subprocess.run(["verkit"] + sub_args)
+                    return res.returncode
+                except FileNotFoundError:
+                    print("Error: 'verkit' command not found. Install it with 'uv tool install verkit'.", file=sys.stderr)
+                    return 1
+
+
+
 
     parser = argparse.ArgumentParser(description="clicue - teleprompter script scroller")
     parser.add_argument(

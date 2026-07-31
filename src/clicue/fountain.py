@@ -28,31 +28,83 @@ def is_character_name(line: str) -> bool:
         return True
     return False
 
-def parse_emphasis_word(raw_word: str) -> tuple[str, str]:
+def process_word_emphasis(raw_word: str, in_italic: bool, in_bold: bool, in_code: bool) -> tuple[str, str, bool, bool, bool]:
     """
-    Parses Markdown/Fountain emphasis delimiters (*word*, _word_, **word**)
-    and returns (clean_word, rich_style_string).
+    Parses single-word or multi-word Fountain/Markdown emphasis delimiters (*word*, _word_, **bold**, `code`).
+    Returns (clean_word, style_string, next_in_italic, next_in_bold, next_in_code).
     """
-    # Match emphasis delimiters (*, _, **, __, ***, ___) around a word
-    m = re.match(r"^([^\w\*\_]*)([\*\_]+)(.*?)([\*\_]+)([^\w\*\_]*)$", raw_word)
-    if m:
-        prefix, start_delim, core, end_delim, suffix = m.groups()
-        if core:
-            clean = f"{prefix}{core}{suffix}"
-            delim_len = min(len(start_delim), len(end_delim))
-            if delim_len >= 3:
-                return clean, "bold italic"
-            elif delim_len == 2:
-                return clean, "bold"
-            else:
-                return clean, "italic"
+    word = raw_word
+    
+    # Check starting backtick code delimiter `
+    starts_code = word.startswith("`")
+    if starts_code:
+        in_code = True
+        word = word[1:]
 
-    return raw_word, ""
+    # Check starting delimiters (*, _, **, __, ***, ___)
+    starts_triple = word.startswith("***") or word.startswith("___")
+    starts_double = (word.startswith("**") or word.startswith("__")) and not starts_triple
+    starts_single = (word.startswith("*") or word.startswith("_")) and not starts_double and not starts_triple
+
+    if starts_triple:
+        in_italic = True
+        in_bold = True
+        word = word[3:]
+    elif starts_double:
+        in_bold = True
+        word = word[2:]
+    elif starts_single:
+        in_italic = True
+        word = word[1:]
+
+    ends_triple = False
+    ends_double = False
+    ends_single = False
+    ends_code = False
+
+    # Check ending delimiters (` or *, _, **, __, ***, ___) before optional trailing punctuation
+    m_end = re.match(r"^(.*?)([\*\_\`]+)([^\w\*\_\`]*)$", word)
+    if m_end:
+        core, end_delim, punc = m_end.groups()
+        if "`" in end_delim:
+            ends_code = True
+            end_delim = end_delim.replace("`", "")
+        
+        if len(end_delim) >= 3:
+            ends_triple = True
+        elif len(end_delim) == 2:
+            ends_double = True
+        elif len(end_delim) == 1:
+            ends_single = True
+            
+        word = f"{core}{punc}"
+
+    style_parts = []
+    if in_code:
+        style_parts.append("cyan")
+    if in_bold:
+        style_parts.append("bold")
+    if in_italic:
+        style_parts.append("italic")
+        
+    style_str = " ".join(style_parts)
+
+    if ends_code:
+        in_code = False
+    if ends_triple:
+        in_italic = False
+        in_bold = False
+    elif ends_double:
+        in_bold = False
+    elif ends_single:
+        in_italic = False
+
+    return word, style_str, in_italic, in_bold, in_code
 
 def parse_fountain(content: str) -> ParsedScript:
     """
     Parses Fountain or markdown script content.
-    Extracts spoken dialogue words, emphasis styles (*italic*, _underline_),
+    Extracts spoken dialogue words, emphasis styles (*italic*, _italic_, **bold**, `code`),
     active stage cues ([Screen Recording...]), and paragraph boundaries.
     """
     lines = content.splitlines()
@@ -66,11 +118,18 @@ def parse_fountain(content: str) -> ParsedScript:
     in_header = True
     next_is_para_start = True
 
+    in_italic = False
+    in_bold = False
+    in_code = False
+
     for line in lines:
         stripped = line.strip()
 
         if not stripped:
             next_is_para_start = True
+            in_italic = False
+            in_bold = False
+            in_code = False
             continue
 
         # Check for metadata header
@@ -100,7 +159,7 @@ def parse_fountain(content: str) -> ParsedScript:
         if line_clean:
             line_words = line_clean.split()
             for i, raw_w in enumerate(line_words):
-                clean_w, word_style = parse_emphasis_word(raw_w)
+                clean_w, word_style, in_italic, in_bold, in_code = process_word_emphasis(raw_w, in_italic, in_bold, in_code)
                 words.append(clean_w)
                 styles.append(word_style)
                 cues.append(current_cue)

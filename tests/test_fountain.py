@@ -34,5 +34,13 @@ I wanted an easy way to look at the next step.
 
 
 
+    def test_backtick_code_parsing(self):
+        from clicue.fountain import parse_fountain
+        fountain_content = "Run `clicue version` or `uv run clicue` command."
+        parsed = parse_fountain(fountain_content)
+        self.assertEqual(parsed.words, ["Run", "clicue", "version", "or", "uv", "run", "clicue", "command."])
+        self.assertEqual(parsed.styles, ["", "cyan", "cyan", "", "cyan", "cyan", "cyan", ""])
+
 if __name__ == '__main__':
+
     unittest.main()
