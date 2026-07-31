@@ -44,9 +44,10 @@ class TUIScroller:
         header_text = Text()
 
         if is_paused:
-            header_text.append("[PAUSED ⏸] ", style="bold black on yellow")
+            header_text.append("[CLICUE PAUSED ⏸] ", style="bold black on yellow")
         else:
-            header_text.append("[TRACKING ▶] ", style="bold white on green")
+            header_text.append("[CLICUE TRACKING ▶] ", style="bold white on green")
+
 
         active_cue = self.script.cues[current_index] if len(self.script.cues) > current_index else ""
         if active_cue:
