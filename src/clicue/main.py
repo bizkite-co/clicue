@@ -159,6 +159,43 @@ def main(args=None):
                     print("Error: 'verkit' command not found. Install it with 'uv tool install verkit'.", file=sys.stderr)
                     return 1
 
+    # Support positional 'models' or 'purge-models' subcommands
+    if args and args[0].lower() in ("models", "purge-models"):
+        from clicue.models import list_downloaded_models, purge_models, get_data_dir
+        cmd = args[0].lower()
+        sub_args = args[1:]
+        
+        if cmd == "purge-models" or (sub_args and sub_args[0].lower() == "purge"):
+            target = "all"
+            if cmd == "purge-models" and sub_args:
+                target = sub_args[0]
+            elif cmd == "models" and len(sub_args) > 1:
+                target = sub_args[1]
+
+            removed = purge_models(target)
+            if not removed:
+                print("No matching downloaded models found to purge.")
+            else:
+                total_freed = sum(size for _, size in removed)
+                mb_freed = total_freed / (1024 * 1024)
+                print(f"Purged {len(removed)} model(s) ({mb_freed:.1f} MB freed):")
+                for name, size in removed:
+                    print(f"  - {name} ({size / (1024*1024):.1f} MB)")
+            return 0
+
+        # Default: list models
+        models = list_downloaded_models()
+        data_dir = get_data_dir()
+        if not models:
+            print(f"No downloaded models in {data_dir}")
+        else:
+            print(f"Downloaded models in {data_dir}:")
+            for name, size in models:
+                size_str = f"{size / (1024*1024*1024):.2f} GB" if size >= 1024**3 else f"{size / (1024*1024):.1f} MB"
+                print(f"  - {name} ({size_str})")
+        return 0
+
+
 
 
 

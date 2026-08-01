@@ -1,8 +1,42 @@
 import os
 import sys
+import shutil
 import urllib.request
 import zipfile
 from pathlib import Path
+
+
+def list_downloaded_models() -> list[tuple[str, int]]:
+    """Lists downloaded model directories and their size in bytes."""
+    models_dir = get_data_dir()
+    results = []
+    if models_dir.exists():
+        for item in models_dir.iterdir():
+            if item.is_dir():
+                size_bytes = sum(f.stat().st_size for f in item.rglob("*") if f.is_file())
+                results.append((item.name, size_bytes))
+    return results
+
+def purge_models(target: str = "all") -> list[tuple[str, int]]:
+    """
+    Removes downloaded models from ~/.local/share/clicue/models/.
+    Returns list of (removed_model_name, freed_bytes).
+    """
+    models_dir = get_data_dir()
+    removed = []
+    
+    if not models_dir.exists():
+        return removed
+
+    for item in list(models_dir.iterdir()):
+        if item.is_dir():
+            if target.lower() in ("all", "*") or target.lower() in item.name.lower():
+                size_bytes = sum(f.stat().st_size for f in item.rglob("*") if f.is_file())
+                shutil.rmtree(item)
+                removed.append((item.name, size_bytes))
+                
+    return removed
+
 
 VOSK_MODELS = {
     "vosk-small": {
