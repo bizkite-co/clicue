@@ -69,11 +69,14 @@ uv tool upgrade clicue
 ## 📖 Usage & Examples
 
 ```bash
-# Open a Fountain script with default Vosk STT engine:
-clicue script.fountain.md
+# Open a Fountain script (.fountain, .fountain.md, or .md) with default Vosk STT engine:
+clicue script.fountain
 
 # Use Faster-Whisper neural STT engine:
-clicue script.fountain.md --whisper
+clicue script.fountain --whisper
+
+# Open a Fountain markdown script:
+clicue script.fountain.md
 
 # Re-open and continue the last-used script:
 clicue -c
@@ -109,12 +112,12 @@ While `clicue` is running, the keyboard is monitored with zero-latency non-block
 
 ```text
 USAGE:
-  clicue <script.fountain.md> [options]
+  clicue <script.fountain | script.md> [options]
   clicue -c | --continue [options]
-  cat script.md | clicue [options]
+  cat script.fountain | clicue [options]
 
 ARGUMENTS & OPTIONS:
-  script                Path to Fountain screenplay/script file (or '-' for stdin).
+  script                Path to script file (.fountain, .fountain.md, .md, or '-' for stdin).
   -c, --continue        Re-open and continue the last-used script file.
   --whisper             Shortcut for Faster-Whisper neural STT engine.
   --engine <name>        STT engine plugin ('vosk' or 'whisper'). Default: vosk.
