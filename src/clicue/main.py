@@ -107,6 +107,44 @@ def parse_words_from_file(file_obj, raw=False):
 
 from rich.console import Console
 
+def print_custom_help():
+    console = Console()
+    
+    console.print("\n[bold cyan]CLICUE[/bold cyan] [dim]– Speech-Driven Live Teleprompter Scroller[/dim]\n")
+    
+    console.print("[bold yellow]USAGE:[/bold yellow]")
+    console.print("  [bold green]clicue[/bold green] [cyan]<script.fountain.md>[/cyan] [dim][options][/dim]")
+    console.print("  [bold green]clicue[/bold green] [cyan]-c[/cyan] | [cyan]--continue[/cyan] [dim][options][/dim]")
+    console.print("  [bold green]cat[/bold green] script.md | [bold green]clicue[/bold green] [dim][options][/dim]\n")
+
+    console.print("[bold yellow]EXAMPLES:[/bold yellow]")
+    console.print("  [bold green]clicue[/bold green] [cyan]script.fountain.md[/cyan]                   Open script with default Vosk STT engine")
+    console.print("  [bold green]clicue[/bold green] [cyan]script.fountain.md[/cyan] [magenta]--whisper[/magenta]         Use Faster-Whisper neural STT engine")
+    console.print("  [bold green]clicue[/bold green] [cyan]-c[/cyan]                                   Re-open and continue the last-used script")
+    console.print("  [bold green]clicue[/bold green] [cyan]-c[/cyan] [magenta]--whisper[/magenta]                         Continue last script with Faster-Whisper")
+    console.print("  [bold green]clicue[/bold green] [cyan]script.fountain.md[/cyan] [magenta]-d[/magenta]                Enable real-time latency debug header overlay")
+    console.print("  [bold green]clicue[/bold green] [cyan]models[/cyan]                                List downloaded speech recognition models")
+    console.print("  [bold green]clicue[/bold green] [cyan]logs[/cyan]                                  Inspect performance log sessions\n")
+
+    console.print("[bold yellow]ARGUMENTS & OPTIONS:[/bold yellow]")
+    console.print("  [cyan]script[/cyan]                Path to Fountain screenplay/script file (or '-' for stdin).")
+    console.print("  [cyan]-c, --continue[/cyan]        Re-open and continue the last-used script file.")
+    console.print("  [cyan]--whisper[/cyan]             Shortcut for Faster-Whisper neural STT engine.")
+    console.print("  [cyan]--engine[/cyan] <name>        STT engine plugin ('vosk' or 'whisper'). Default: vosk.")
+    console.print("  [cyan]--model[/cyan] <name>         Model shortcut ('vosk-small', 'vosk-full', 'base.en', 'tiny.en').")
+    console.print("  [cyan]-d, --debug[/cyan]           Display real-time STT, Aligner, and Render latency in header.")
+    console.print("  [cyan]--perf-log[/cyan]            Enable date-stamped session performance logging.")
+    console.print("  [cyan]--raw[/cyan]                 Read text literally without parsing Fountain syntax.")
+    console.print("  [cyan]-h, --help[/cyan]            Show this help message and exit.")
+    console.print("  [cyan]-V, --version[/cyan]         Show clicue version details and exit.\n")
+
+    console.print("[bold yellow]LIVE TUI SHORTCUTS:[/bold yellow]")
+    console.print("  [bold white]r / 0 / Home[/bold white]       Restart teleprompter from word 0 & flush audio buffers")
+    console.print("  [bold white]q / Esc[/bold white]            Quit teleprompter immediately")
+    console.print("  [bold white]Space / p[/bold white]          Pause / Resume auto-scrolling")
+    console.print("  [bold white]Left / Right[/bold white]        Seek backward / forward 5 words")
+    console.print("  [bold white]d[/bold white]                  Toggle live latency debug header overlay\n")
+
 def print_version_details():
     console = Console()
     running_ver = get_running_version()
@@ -281,7 +319,13 @@ def main(args=None):
                 print(f"  - [{s['date']}] {s['filename']} ({size_str}, {s['mtime'].strftime('%H:%M:%S')})")
         return 0
 
-    parser = argparse.ArgumentParser(description="clicue - teleprompter script scroller")
+    parser = argparse.ArgumentParser(description="clicue - teleprompter script scroller", add_help=False)
+    parser.add_argument(
+        "--help",
+        "-h",
+        action="store_true",
+        help="Show clicue help and exit."
+    )
     parser.add_argument(
         "--version",
         "-V",
@@ -293,7 +337,14 @@ def main(args=None):
         "script",
         nargs="?",
         default=None,
-        help="Path to the script file (or '-' for stdin). If omitted, uses last script or stdin.",
+        help="Path to the script file (or '-' for stdin).",
+    )
+    parser.add_argument(
+        "--continue",
+        "-c",
+        action="store_true",
+        dest="continue_last",
+        help="Re-open and continue the last-used script file."
     )
 
     parser.add_argument(
@@ -394,6 +445,10 @@ def main(args=None):
     
     parsed_args = parser.parse_args(args)
 
+    if parsed_args.help:
+        print_custom_help()
+        return 0
+
     if parsed_args.list_devices:
         import sounddevice as sd
         print("Available Audio Devices:")
@@ -439,7 +494,17 @@ def main(args=None):
     target_file = None
     should_close = False
 
-    if parsed_args.script:
+    if parsed_args.continue_last:
+        last_p = get_last_script()
+        if last_p:
+            Console().print(f"[bold cyan]Continuing last script:[/bold cyan] {last_p}")
+            target_file = open(last_p, "r", encoding="utf-8")
+            should_close = True
+        else:
+            Console().print("[bold red]Error:[/bold red] No previous script found to continue.")
+            print_custom_help()
+            return 1
+    elif parsed_args.script:
         if parsed_args.script == "-":
             target_file = sys.stdin
         else:
@@ -449,21 +514,11 @@ def main(args=None):
             save_last_script(parsed_args.script)
             target_file = open(parsed_args.script, "r", encoding="utf-8")
             should_close = True
+    elif not sys.stdin.isatty():
+        target_file = sys.stdin
     else:
-        # Check if stdin is piped (e.g. cat script.md | clicue)
-        if not sys.stdin.isatty():
-            target_file = sys.stdin
-        else:
-            last_p = get_last_script()
-            if last_p:
-                Console().print(f"[bold cyan]Using last script:[/bold cyan] {last_p}")
-                target_file = open(last_p, "r", encoding="utf-8")
-                should_close = True
-            else:
-                Console().print("[bold red]Error:[/bold red] No script file provided.")
-                Console().print("[bold white]Usage:[/bold white] clicue <script.fountain.md> [options]")
-                Console().print("[dim]Tip: Pass a script file path or pipe text into clicue.[/dim]")
-                return 1
+        print_custom_help()
+        return 1
 
     try:
         script = parse_script_from_file(target_file, raw=parsed_args.raw)
