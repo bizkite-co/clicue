@@ -1,5 +1,4 @@
 from rich.console import Console, Group
-from rich.padding import Padding
 from rich.text import Text
 
 from clicue.fountain import ParsedScript
@@ -46,8 +45,6 @@ class TUIScroller:
                     lines.append(current_line)
                     current_line = []
                     current_length = 0
-                # Add empty line for paragraph spacing
-                lines.append([])
 
             # If adding word exceeds terminal width, wrap to next line
             if current_line and (current_length + word_len > width):
@@ -99,7 +96,7 @@ class TUIScroller:
 
         # 2. Line-Anchored Text Body (1 previous row max context)
         width = max(40, self.console.width - 2)
-        height = max(10, self.console.height - 3)
+        height = max(10, self.console.height - 2)
 
         lines = self._build_wrapped_lines(width)
 
@@ -121,7 +118,6 @@ class TUIScroller:
                 body_text.append("\n")
 
             if not line:
-                # Empty line for paragraph spacing
                 continue
 
             for word_idx in line:
@@ -136,12 +132,23 @@ class TUIScroller:
                     style_str = f"white {word_style}".strip()
 
                 body_text.append(word, style=style_str)
-                body_text.append(" ")
+
+                # Check if word_idx is the last word of a paragraph
+                is_last_word = (
+                    word_idx + 1 < len(self.script.words) and
+                    self.script.para_starts[word_idx + 1]
+                )
+
+                if is_last_word:
+                    para_style = "dim cyan" if word_idx < current_index else "cyan"
+                    body_text.append(" ¶ ", style=para_style)
+                else:
+                    body_text.append(" ")
 
 
         return Group(
-            Padding(header_text, (0, 0, 1, 0)),
-            Padding(body_text, (0, 0, 0, 0))
+            header_text,
+            body_text
         )
 
     def render_text(self, current_index: int, is_paused: bool = False):

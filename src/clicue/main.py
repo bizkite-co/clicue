@@ -530,10 +530,12 @@ def main(args=None):
 
     target_file = None
     should_close = False
+    active_script_path = None
 
     if parsed_args.continue_last:
         last_p = get_last_script()
         if last_p:
+            active_script_path = last_p
             Console().print(f"[bold cyan]Continuing last script:[/bold cyan] {last_p}")
             target_file = open(last_p, "r", encoding="utf-8")
             should_close = True
@@ -548,6 +550,7 @@ def main(args=None):
             if not os.path.isfile(parsed_args.script):
                 print(f"Error: Script file '{parsed_args.script}' not found.", file=sys.stderr)
                 return 1
+            active_script_path = str(pathlib.Path(parsed_args.script).resolve())
             save_last_script(parsed_args.script)
             target_file = open(parsed_args.script, "r", encoding="utf-8")
             should_close = True
@@ -628,6 +631,23 @@ def main(args=None):
                     elif key in ('r', 'R', '0', 'HOME'):
                         current_idx = 0
                         aligner.current_index = 0
+
+                        # Reload script file from disk if path exists
+                        if active_script_path and os.path.isfile(active_script_path):
+                            try:
+                                with open(active_script_path, "r", encoding="utf-8") as f:
+                                    reloaded_script = parse_script_from_file(f, raw=parsed_args.raw)
+                                    if reloaded_script and reloaded_script.words:
+                                        script = reloaded_script
+                                        aligner.script_words = script.words
+                                        aligner.lower_words = [w.lower() for w in script.words]
+                                        scroller.script = script
+                                        scroller._cached_lines = None
+                                        if perf_logger:
+                                            perf_logger.log("FILE_RELOAD", f"Reloaded script from '{active_script_path}' ({len(script.words)} words)")
+                            except Exception as ex:
+                                if perf_logger:
+                                    perf_logger.log("RELOAD_ERROR", f"Failed to reload script: {ex}")
 
                         # Flush pending STT queue and reset audio listener state
                         with audio_queue.mutex:
