@@ -54,11 +54,17 @@ class WhisperSTTListener(BaseSTTListener):
                 yield text
                 t0 = time.perf_counter()
 
+    def reset(self):
+        """Flushes incoming audio queue and clears accumulated speech buffers."""
+        with self.q.mutex:
+            self.q.queue.clear()
+        self.reset_requested = True
+
     def listen(self, device=None):
         target_device = device if device is not None else self.device_id
         
-        # Audio buffer accumulator (stores float32 samples)
-        buffer_samples = []
+        self.buffer_samples = []
+        self.reset_requested = False
         min_samples = int(self.sample_rate * 0.8) # 800ms minimum speech buffer
         max_samples = int(self.sample_rate * 3.0) # 3.0s rolling max
 
@@ -72,13 +78,19 @@ class WhisperSTTListener(BaseSTTListener):
                 callback=self._audio_callback
             ):
                 while True:
+                    if self.reset_requested:
+                        self.buffer_samples.clear()
+                        with self.q.mutex:
+                            self.q.queue.clear()
+                        self.reset_requested = False
+
                     # Accumulate incoming audio blocks
                     while not self.q.empty():
                         block = self.q.get()
-                        buffer_samples.extend(block.flatten())
+                        self.buffer_samples.extend(block.flatten())
 
-                    if len(buffer_samples) >= min_samples:
-                        audio_data = np.array(buffer_samples, dtype=np.float32)
+                    if len(self.buffer_samples) >= min_samples:
+                        audio_data = np.array(self.buffer_samples, dtype=np.float32)
                         
                         t0 = time.perf_counter()
                         # Transcribe audio buffer
@@ -92,14 +104,14 @@ class WhisperSTTListener(BaseSTTListener):
                         lat_ms = (time.perf_counter() - t0) * 1000.0
                         
                         full_text = " ".join([seg.text.strip() for seg in segments if seg.text.strip()])
-                        if full_text:
+                        if full_text and not self.reset_requested:
                             if self.perf_logger:
                                 self.perf_logger.record_stt(full_text, lat_ms)
                             yield full_text
 
                         # Maintain rolling buffer overlap
-                        if len(buffer_samples) > max_samples:
-                            buffer_samples = buffer_samples[-int(self.sample_rate * 0.5):]
+                        if len(self.buffer_samples) > max_samples:
+                            self.buffer_samples = self.buffer_samples[-int(self.sample_rate * 0.5):]
 
                     time.sleep(0.15)
 

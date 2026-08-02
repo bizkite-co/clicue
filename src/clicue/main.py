@@ -467,6 +467,16 @@ def main(args=None):
                     elif key in ('r', 'R', '0', 'HOME'):
                         current_idx = 0
                         aligner.current_index = 0
+
+                        # Flush pending STT queue and reset audio listener state
+                        with audio_queue.mutex:
+                            audio_queue.queue.clear()
+                        if hasattr(listener, 'reset'):
+                            listener.reset()
+
+                        if perf_logger:
+                            perf_logger.log("RESTART_EVENT", "Teleprompter cursor and audio buffers reset to start (0)")
+
                         r0 = time.perf_counter()
                         live.update(scroller.render(current_idx, is_paused=is_paused), refresh=True)
                         perf_logger.record_render((time.perf_counter() - r0) * 1000.0)

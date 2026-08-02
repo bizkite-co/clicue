@@ -64,6 +64,16 @@ class VoskSTTListener(BaseSTTListener):
         if text:
             yield text
 
+    def reset(self):
+        """Flushes incoming audio queue and resets Kaldi recognizer state."""
+        with self.q.mutex:
+            self.q.queue.clear()
+        if hasattr(self, 'recognizer') and self.recognizer:
+            try:
+                self.recognizer.Reset()
+            except Exception:
+                pass
+
     def listen(self, device=None):
         target_device = device if device is not None else self.device
         try:
