@@ -1,4 +1,5 @@
 import argparse
+import os
 import sys
 import time
 from rich.live import Live
@@ -53,6 +54,42 @@ def get_local_project_version() -> str | None:
     return None
 
 get_version = get_running_version
+
+def get_clicue_data_dir() -> pathlib.Path:
+    if sys.platform == "win32":
+        base = pathlib.Path(os.environ.get("LOCALAPPDATA", pathlib.Path.home() / "AppData" / "Local"))
+    elif sys.platform == "darwin":
+        base = pathlib.Path.home() / "Library" / "Application Support"
+    else:
+        base = pathlib.Path(os.environ.get("XDG_DATA_HOME", pathlib.Path.home() / ".local" / "share"))
+    d = base / "clicue"
+    d.mkdir(parents=True, exist_ok=True)
+    return d
+
+def get_last_script_file() -> pathlib.Path:
+    return get_clicue_data_dir() / "last_script.txt"
+
+def save_last_script(path_str: str):
+    try:
+        if path_str and path_str != "-":
+            f = get_last_script_file()
+            f.parent.mkdir(parents=True, exist_ok=True)
+            abs_p = str(pathlib.Path(path_str).resolve())
+            f.write_text(abs_p, encoding="utf-8")
+    except Exception:
+        pass
+
+def get_last_script() -> str | None:
+    try:
+        f = get_last_script_file()
+        if f.exists():
+            content = f.read_text(encoding="utf-8").strip()
+            if content and os.path.isfile(content):
+                return content
+    except Exception:
+        pass
+    return None
+
 
 def parse_script_from_file(file_obj, raw=False) -> ParsedScript:
     content = file_obj.read()
@@ -255,9 +292,8 @@ def main(args=None):
     parser.add_argument(
         "script",
         nargs="?",
-        type=argparse.FileType("r"),
-        default=sys.stdin,
-        help="Path to the script file (or '-' for stdin). If omitted, reads from stdin.",
+        default=None,
+        help="Path to the script file (or '-' for stdin). If omitted, uses last script or stdin.",
     )
 
     parser.add_argument(
@@ -400,7 +436,40 @@ def main(args=None):
         model_path = resolve_model_path(model_input)
 
 
-    script = parse_script_from_file(parsed_args.script, raw=parsed_args.raw)
+    target_file = None
+    should_close = False
+
+    if parsed_args.script:
+        if parsed_args.script == "-":
+            target_file = sys.stdin
+        else:
+            if not os.path.isfile(parsed_args.script):
+                print(f"Error: Script file '{parsed_args.script}' not found.", file=sys.stderr)
+                return 1
+            save_last_script(parsed_args.script)
+            target_file = open(parsed_args.script, "r", encoding="utf-8")
+            should_close = True
+    else:
+        # Check if stdin is piped (e.g. cat script.md | clicue)
+        if not sys.stdin.isatty():
+            target_file = sys.stdin
+        else:
+            last_p = get_last_script()
+            if last_p:
+                Console().print(f"[bold cyan]Using last script:[/bold cyan] {last_p}")
+                target_file = open(last_p, "r", encoding="utf-8")
+                should_close = True
+            else:
+                Console().print("[bold red]Error:[/bold red] No script file provided.")
+                Console().print("[bold white]Usage:[/bold white] clicue <script.fountain.md> [options]")
+                Console().print("[dim]Tip: Pass a script file path or pipe text into clicue.[/dim]")
+                return 1
+
+    try:
+        script = parse_script_from_file(target_file, raw=parsed_args.raw)
+    finally:
+        if should_close and target_file:
+            target_file.close()
     
     if not script.words:
         print("Script is empty.")

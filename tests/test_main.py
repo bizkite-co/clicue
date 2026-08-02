@@ -69,6 +69,31 @@ class TestCLI(unittest.TestCase):
         finally:
             os.remove(temp_path)
 
+    @patch('clicue.main.get_stt_listener')
+    def test_last_script_fallback(self, mock_get_stt_listener):
+        mock_listener = MagicMock()
+        mock_listener.listen.return_value = []
+        mock_get_stt_listener.return_value = mock_listener
+
+        import tempfile
+        with tempfile.NamedTemporaryFile(mode='w', delete=False) as f:
+            f.write("one two three")
+            temp_path = f.name
+
+        try:
+            # 1. Run with explicit file path to save last script
+            with patch('sys.stdout', new=io.StringIO()):
+                main.main([temp_path])
+
+            # 2. Run with no arguments (simulating fallback to last script)
+            with patch('sys.stdout', new=io.StringIO()) as fake_stdout:
+                with patch('sys.stdin.isatty', return_value=True):
+                    res = main.main([])
+                self.assertEqual(res, 0)
+                self.assertIn("Using last script", fake_stdout.getvalue())
+        finally:
+            os.remove(temp_path)
+
 
 
 if __name__ == '__main__':
