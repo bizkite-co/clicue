@@ -65,7 +65,7 @@ class WhisperSTTListener(BaseSTTListener):
         
         self.buffer_samples = []
         self.reset_requested = False
-        min_samples = int(self.sample_rate * 0.8) # 800ms minimum speech buffer
+        min_samples = int(self.sample_rate * 0.5) # 500ms minimum speech buffer for rapid 50ms latency
         max_samples = int(self.sample_rate * 3.0) # 3.0s rolling max
 
         try:
@@ -92,6 +92,18 @@ class WhisperSTTListener(BaseSTTListener):
                     if len(self.buffer_samples) >= min_samples:
                         audio_data = np.array(self.buffer_samples, dtype=np.float32)
                         
+                        # 1. Local RMS Energy Silence Gate (0.001ms instantaneous check)
+                        rms = np.sqrt(np.mean(audio_data**2))
+                        if rms < 0.003:
+                            self.buffer_samples = self.buffer_samples[-int(self.sample_rate * 0.2):]
+                            time.sleep(0.1)
+                            continue
+
+                        # 2. Peak Audio Normalization for quiet mic inputs
+                        max_val = np.max(np.abs(audio_data))
+                        if 0.01 < max_val < 0.8:
+                            audio_data = (audio_data / max_val) * 0.8
+
                         t0 = time.perf_counter()
                         # Transcribe audio buffer
                         segments, _ = self.model.transcribe(
@@ -99,7 +111,7 @@ class WhisperSTTListener(BaseSTTListener):
                             language="en",
                             beam_size=1,
                             vad_filter=True,
-                            vad_parameters=dict(min_silence_duration_ms=300)
+                            vad_parameters=dict(min_silence_duration_ms=200)
                         )
                         lat_ms = (time.perf_counter() - t0) * 1000.0
                         
@@ -112,7 +124,7 @@ class WhisperSTTListener(BaseSTTListener):
                         # Always trim buffer to 0.2s trailing overlap after transcription to prevent duplicate re-transcription of silence
                         self.buffer_samples = self.buffer_samples[-int(self.sample_rate * 0.2):]
 
-                    time.sleep(0.15)
+                    time.sleep(0.1)
 
         except sd.PortAudioError as e:
             print(f"\n[Error] Could not open audio input device ({target_device}): {e}", file=sys.stderr)
