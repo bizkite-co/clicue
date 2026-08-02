@@ -1,5 +1,6 @@
 import argparse
 import sys
+import time
 from rich.live import Live
 
 from clicue.aligner import Aligner
