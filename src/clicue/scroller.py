@@ -4,12 +4,13 @@ from rich.text import Text
 from clicue.fountain import ParsedScript, process_word_emphasis
 
 
-def append_styled_cue(header_text: Text, cue: str):
+def append_styled_cue(header_text: Text, cue: str, is_new_cue: bool = False):
     """
     Parses inline markdown syntax (`code`, *italic*, **bold**) in cue strings
     and appends them to header_text with dark grey background (#262626).
+    If is_new_cue is True (within 1.0s of cue change), text renders in bright white.
     """
-    header_text.append(" 🎬 ", style="yellow on #262626")
+    header_text.append(" 🎬 ", style="bold bright_white on #262626" if is_new_cue else "yellow on #262626")
     cue_words = cue.split()
     in_italic = False
     in_bold = False
@@ -22,9 +23,9 @@ def append_styled_cue(header_text: Text, cue: str):
         if "cyan" in style_str:
             styles.append("bold cyan")
         elif "bold" in style_str:
-            styles.append("bold white")
+            styles.append("bold bright_white")
         else:
-            styles.append("bold bright_yellow")
+            styles.append("bold bright_white" if is_new_cue else "bold bright_yellow")
 
         if "italic" in style_str:
             styles.append("italic")
@@ -54,6 +55,8 @@ class TUIScroller:
         self.console = Console()
         self._cached_width = None
         self._cached_lines = None
+        self._last_cue = None
+        self._cue_change_time = 0.0
 
     def _build_wrapped_lines(self, width: int):
         """
@@ -101,6 +104,7 @@ class TUIScroller:
         - Text Body: Line-anchored to display strictly 1 previous row of text at top,
           maximizing upcoming line visibility with zero reflow.
         """
+        import time
         current_index = max(0, min(current_index, len(self.script) - 1)) if len(self.script) > 0 else 0
         
         # 1. Header (Status Badge + Stage Cue + Optional Latency Stats)
@@ -119,7 +123,13 @@ class TUIScroller:
 
         active_cue = self.script.cues[current_index] if len(self.script.cues) > current_index else ""
         if active_cue:
-            append_styled_cue(header_text, active_cue)
+            now = time.perf_counter()
+            if active_cue != self._last_cue:
+                self._last_cue = active_cue
+                self._cue_change_time = now
+
+            is_new_cue = (now - self._cue_change_time) < 1.0
+            append_styled_cue(header_text, active_cue, is_new_cue=is_new_cue)
         else:
             header_text.append(" 🎬 ", style="dim yellow on #1c1c1c")
             header_text.append("(no active cue) ", style="dim yellow on #1c1c1c")
