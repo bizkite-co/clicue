@@ -108,10 +108,11 @@ class WhisperSTTListener(BaseSTTListener):
                             if self.perf_logger:
                                 self.perf_logger.record_stt(full_text, lat_ms)
                             yield full_text
-
-                        # Maintain rolling buffer overlap
-                        if len(self.buffer_samples) > max_samples:
-                            self.buffer_samples = self.buffer_samples[-int(self.sample_rate * 0.5):]
+                            # Trim buffer down to 0.2s trailing overlap after emitting text
+                            self.buffer_samples = self.buffer_samples[-int(self.sample_rate * 0.2):]
+                        elif len(self.buffer_samples) > max_samples:
+                            # Trim buffer if max length reached with no text
+                            self.buffer_samples = self.buffer_samples[-int(self.sample_rate * 0.2):]
 
                     time.sleep(0.15)
 
