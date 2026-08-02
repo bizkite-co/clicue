@@ -20,13 +20,17 @@ class TUIScroller:
         self.debug = debug
         self.perf_logger = perf_logger
         self.console = Console()
+        self._cached_width = None
+        self._cached_lines = None
 
     def _build_wrapped_lines(self, width: int):
         """
         Groups script word indices into terminal line rows based on column width
-        and paragraph breaks.
-        Returns a list of lists of word indices, e.g. [[0, 1, 2], [3, 4], ...]
+        and paragraph breaks. Memoizes results to eliminate per-frame allocations.
         """
+        if self._cached_width == width and self._cached_lines is not None:
+            return self._cached_lines
+
         lines = []
         current_line = []
         current_length = 0
@@ -56,6 +60,8 @@ class TUIScroller:
         if current_line:
             lines.append(current_line)
 
+        self._cached_width = width
+        self._cached_lines = lines
         return lines
 
     def render(self, current_index: int, is_paused: bool = False) -> Group:
