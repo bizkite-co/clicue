@@ -123,6 +123,7 @@ def print_custom_help():
     console.print("  [bold green]clicue[/bold green] [cyan]-c[/cyan]                                   Re-open and continue the last-used script")
     console.print("  [bold green]clicue[/bold green] [cyan]-c[/cyan] [magenta]--whisper[/magenta]                         Continue last script with Faster-Whisper")
     console.print("  [bold green]clicue[/bold green] [cyan]script.fountain.md[/cyan] [magenta]-d[/magenta]                Enable real-time latency debug header overlay")
+    console.print("  [bold green]clicue[/bold green] [cyan]self-up[/cyan]                               Self-update clicue to latest PyPI version")
     console.print("  [bold green]clicue[/bold green] [cyan]models[/cyan]                                List downloaded speech recognition models")
     console.print("  [bold green]clicue[/bold green] [cyan]logs[/cyan]                                  Inspect performance log sessions\n")
 
@@ -135,6 +136,7 @@ def print_custom_help():
     console.print("  [cyan]-d, --debug[/cyan]           Display real-time STT, Aligner, and Render latency in header.")
     console.print("  [cyan]--perf-log[/cyan]            Enable date-stamped session performance logging.")
     console.print("  [cyan]--raw[/cyan]                 Read text literally without parsing Fountain syntax.")
+    console.print("  [cyan]self-up / self-update[/cyan] Self-update clicue to latest PyPI version.")
     console.print("  [cyan]-h, --help[/cyan]            Show this help message and exit.")
     console.print("  [cyan]-V, --version[/cyan]         Show clicue version details and exit.\n")
 
@@ -238,6 +240,30 @@ def main(args=None):
                 except FileNotFoundError:
                     print("Error: 'verkit' command not found. Install it with 'uv tool install verkit'.", file=sys.stderr)
                     return 1
+
+    # Support positional 'self-update', 'self-up', or 'update' subcommands
+    if args and args[0].lower() in ("self-update", "self-up", "update"):
+        console = Console()
+        running_ver = get_running_version()
+        console.print(f"[bold cyan]Checking for updates...[/bold cyan] (Current: v{running_ver})")
+        
+        import subprocess
+        import shutil
+
+        if shutil.which("uv"):
+            upgrade_cmd = ["uv", "tool", "upgrade", "clicue"]
+        elif shutil.which("pipx"):
+            upgrade_cmd = ["pipx", "upgrade", "clicue"]
+        else:
+            upgrade_cmd = [sys.executable, "-m", "pip", "install", "--upgrade", "clicue"]
+
+        console.print(f"[dim]Running:[/dim] {' '.join(upgrade_cmd)}")
+        res = subprocess.run(upgrade_cmd)
+        if res.returncode == 0:
+            console.print("[bold green]clicue update check complete![/bold green]")
+        else:
+            console.print("[bold red]Failed to update clicue.[/bold red]")
+        return res.returncode
 
     # Support positional 'models' or 'purge-models' subcommands
     if args and args[0].lower() in ("models", "purge-models"):
