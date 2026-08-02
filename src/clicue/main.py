@@ -66,28 +66,34 @@ def get_clicue_data_dir() -> pathlib.Path:
     d.mkdir(parents=True, exist_ok=True)
     return d
 
-def get_last_script_file() -> pathlib.Path:
-    return get_clicue_data_dir() / "last_script.txt"
+def get_last_script_candidates() -> list[pathlib.Path]:
+    d1 = get_clicue_data_dir() / "last_script.txt"
+    d2 = get_clicue_data_dir() / "models" / "last_script.txt"
+    d3 = pathlib.Path.home() / ".config" / "clicue" / "last_script.txt"
+    return [d1, d2, d3]
 
 def save_last_script(path_str: str):
     try:
         if path_str and path_str != "-":
-            f = get_last_script_file()
-            f.parent.mkdir(parents=True, exist_ok=True)
             abs_p = str(pathlib.Path(path_str).resolve())
-            f.write_text(abs_p, encoding="utf-8")
+            for f in get_last_script_candidates():
+                try:
+                    f.parent.mkdir(parents=True, exist_ok=True)
+                    f.write_text(abs_p, encoding="utf-8")
+                except Exception:
+                    pass
     except Exception:
         pass
 
 def get_last_script() -> str | None:
-    try:
-        f = get_last_script_file()
-        if f.exists():
-            content = f.read_text(encoding="utf-8").strip()
-            if content and os.path.isfile(content):
-                return content
-    except Exception:
-        pass
+    for f in get_last_script_candidates():
+        try:
+            if f.exists():
+                content = f.read_text(encoding="utf-8").strip()
+                if content and os.path.isfile(content):
+                    return content
+        except Exception:
+            pass
     return None
 
 
