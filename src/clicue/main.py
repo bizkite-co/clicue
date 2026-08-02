@@ -1,21 +1,23 @@
 import argparse
+import json
 import os
+import pathlib
+import re
 import sys
 import time
+import urllib.request
+from importlib.metadata import PackageNotFoundError
+from importlib.metadata import version as get_meta_version
+
 from rich.live import Live
 
 from clicue.aligner import Aligner
+from clicue.config import load_config
+from clicue.fountain import ParsedScript, parse_fountain
+from clicue.models import resolve_model_path
 from clicue.scroller import TUIScroller
 from clicue.stt import get_stt_listener
-from clicue.fountain import parse_fountain, ParsedScript
-from clicue.config import load_config
-from clicue.models import resolve_model_path
 
-import urllib.request
-import json
-import pathlib
-import re
-from importlib.metadata import version as get_meta_version, PackageNotFoundError
 
 def get_running_version() -> str:
     try:
@@ -113,6 +115,7 @@ def parse_words_from_file(file_obj, raw=False):
 
 from rich.console import Console
 
+
 def print_custom_help():
     console = Console()
     
@@ -180,6 +183,7 @@ import select
 import termios
 import tty
 
+
 class KeyboardListener:
     def __enter__(self):
         self.old_settings = None
@@ -235,8 +239,8 @@ def main(args=None):
             print_version_details()
             return 0
         else:
-            import subprocess
             import shutil
+            import subprocess
             if shutil.which("uvx"):
                 res = subprocess.run(["uvx", "verkit@latest"] + sub_args)
                 return res.returncode
@@ -254,8 +258,8 @@ def main(args=None):
         running_ver = get_running_version()
         console.print(f"[bold cyan]Checking for updates...[/bold cyan] (Current: v{running_ver})")
         
-        import subprocess
         import shutil
+        import subprocess
 
         if shutil.which("uv"):
             upgrade_cmd = ["uv", "tool", "upgrade", "clicue"]
@@ -274,7 +278,7 @@ def main(args=None):
 
     # Support positional 'models' or 'purge-models' subcommands
     if args and args[0].lower() in ("models", "purge-models"):
-        from clicue.models import list_downloaded_models, purge_models, get_data_dir
+        from clicue.models import get_data_dir, list_downloaded_models, purge_models
         cmd = args[0].lower()
         sub_args = args[1:]
         
@@ -310,7 +314,7 @@ def main(args=None):
 
     # Support positional 'perf' or 'logs' subcommands
     if args and args[0].lower() in ("perf", "logs", "perf-logs"):
-        from clicue.perf import list_log_sessions, purge_old_logs, get_logs_dir
+        from clicue.perf import get_logs_dir, list_log_sessions, purge_old_logs
         cmd = args[0].lower()
         sub_args = args[1:]
         

@@ -1,5 +1,6 @@
 from abc import ABC, abstractmethod
-from typing import Iterator
+from collections.abc import Iterator
+
 
 class BaseSTTListener(ABC):
     """
@@ -11,7 +12,6 @@ class BaseSTTListener(ABC):
         """
         Listens to continuous live audio input and yields recognized text strings.
         """
-        pass
 
     def listen_file(self, audio_file_path: str) -> Iterator[str]:
         """

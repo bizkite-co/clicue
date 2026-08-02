@@ -1,9 +1,9 @@
 import os
-import sys
-import time
 import shutil
+import sys
 from datetime import datetime, timedelta
 from pathlib import Path
+
 
 def get_logs_dir() -> Path:
     """Returns the user log directory for clicue (~/.local/share/clicue/logs)."""

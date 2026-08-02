@@ -1,11 +1,13 @@
 import os
 import sys
+from typing import Any
+
 if sys.version_info >= (3, 11):
     import tomllib
 else:
     import tomli as tomllib
 
-DEFAULT_CONFIG = {
+DEFAULT_CONFIG: dict[str, dict[str, Any]] = {
     "scroller": {
         "window_size": 38,
         "past_size": 9,
@@ -29,7 +31,7 @@ def load_config(config_path: str = None) -> dict:
     Loads configuration from `.clicue.toml` or `~/.config/clicue/config.toml`.
     Falls back to DEFAULT_CONFIG.
     """
-    cfg = {k: dict(v) for k, v in DEFAULT_CONFIG.items()}
+    cfg = {k: v.copy() for k, v in DEFAULT_CONFIG.items()}
 
     paths_to_check = []
     if config_path:

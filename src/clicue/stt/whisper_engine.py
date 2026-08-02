@@ -13,6 +13,7 @@ warnings.filterwarnings("ignore", module="huggingface_hub")
 import numpy as np
 import sounddevice as sd
 from faster_whisper import WhisperModel
+
 from clicue.stt.base import BaseSTTListener
 
 
@@ -66,7 +67,6 @@ class WhisperSTTListener(BaseSTTListener):
         self.buffer_samples = []
         self.reset_requested = False
         min_samples = int(self.sample_rate * 0.5) # 500ms minimum speech buffer for rapid 50ms latency
-        max_samples = int(self.sample_rate * 3.0) # 3.0s rolling max
 
         try:
             with sd.InputStream(
@@ -111,7 +111,7 @@ class WhisperSTTListener(BaseSTTListener):
                             language="en",
                             beam_size=1,
                             vad_filter=True,
-                            vad_parameters=dict(min_silence_duration_ms=200)
+                            vad_parameters={"min_silence_duration_ms": 200}
                         )
                         lat_ms = (time.perf_counter() - t0) * 1000.0
                         

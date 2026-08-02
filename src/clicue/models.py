@@ -1,6 +1,6 @@
 import os
-import sys
 import shutil
+import sys
 import urllib.request
 import zipfile
 from pathlib import Path

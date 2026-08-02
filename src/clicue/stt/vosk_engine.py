@@ -1,8 +1,9 @@
+import json
 import queue
 import sys
-import json
+
 import sounddevice as sd
-from vosk import Model, KaldiRecognizer, SetLogLevel
+from vosk import KaldiRecognizer, Model, SetLogLevel
 
 from clicue.stt.base import BaseSTTListener
 
@@ -31,8 +32,8 @@ class VoskSTTListener(BaseSTTListener):
         self.q.put(bytes(indata))
 
     def listen_file(self, audio_file_path: str):
-        import wave
         import time
+        import wave
 
         try:
             wf = wave.open(audio_file_path, "rb")

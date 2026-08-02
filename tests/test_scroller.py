@@ -1,10 +1,10 @@
-import unittest
-import sys
 import os
-from rich.text import Text
+import sys
+import unittest
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../src')))
 from clicue.scroller import TUIScroller
+
 
 class TestTUIScroller(unittest.TestCase):
     def setUp(self):

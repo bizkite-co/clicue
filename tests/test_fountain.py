@@ -1,9 +1,10 @@
-import unittest
-import sys
 import os
+import sys
+import unittest
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../src')))
 from clicue.fountain import parse_fountain_words
+
 
 class TestFountainParser(unittest.TestCase):
     def test_fountain_stripping(self):

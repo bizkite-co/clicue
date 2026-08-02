@@ -23,6 +23,21 @@ packages = ["src/clicue"]
 [dependency-groups]
 dev = [
     "verkit",
+    "ruff",
+    "mypy",
 ]
+
+[tool.ruff]
+line-length = 120
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "I"]
+ignore = ["E501", "E402"]
+
+[tool.mypy]
+python_version = "3.12"
+ignore_missing_imports = true
+disable_error_code = ["var-annotated", "import-untyped", "assignment", "arg-type", "type-arg", "override", "misc"]
 
 

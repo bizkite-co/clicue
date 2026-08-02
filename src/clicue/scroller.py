@@ -1,8 +1,9 @@
-from rich.console import Console
-from rich.text import Text
-from rich.console import Group
+from rich.console import Console, Group
 from rich.padding import Padding
+from rich.text import Text
+
 from clicue.fountain import ParsedScript
+
 
 class TUIScroller:
     def __init__(self, script: ParsedScript, window_size: int = 38, past_size: int = 9, debug: bool = False, perf_logger = None):

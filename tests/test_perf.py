@@ -1,11 +1,12 @@
-import unittest
-import tempfile
 import os
 import sys
+import tempfile
+import unittest
 from pathlib import Path
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../src')))
-from clicue.perf import PerfLogger, purge_old_logs
+from clicue.perf import PerfLogger
+
 
 class TestPerfTelemetry(unittest.TestCase):
     def test_perf_logger_lifecycle(self):

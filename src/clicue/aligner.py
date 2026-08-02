@@ -1,6 +1,8 @@
-import time
 import sys
+import time
+
 from rapidfuzz import fuzz
+
 
 class Aligner:
     def __init__(
