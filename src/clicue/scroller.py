@@ -58,6 +58,11 @@ class TUIScroller:
         self._last_cue = None
         self._cue_change_time = 0.0
 
+    @property
+    def is_flashing_cue(self) -> bool:
+        import time
+        return self._cue_change_time > 0 and (time.perf_counter() - self._cue_change_time) < 1.05
+
     def _build_wrapped_lines(self, width: int):
         """
         Groups script word indices into terminal line rows based on column width
@@ -124,13 +129,19 @@ class TUIScroller:
         active_cue = self.script.cues[current_index] if len(self.script.cues) > current_index else ""
         if active_cue:
             now = time.perf_counter()
-            if active_cue != self._last_cue:
+            if self._last_cue is None:
+                # Initial cue at startup: set without triggering flash highlight
+                self._last_cue = active_cue
+                self._cue_change_time = 0.0
+            elif active_cue != self._last_cue:
+                # Cue transition: trigger 1-second white flash highlight
                 self._last_cue = active_cue
                 self._cue_change_time = now
 
             is_new_cue = (now - self._cue_change_time) < 1.0
             append_styled_cue(header_text, active_cue, is_new_cue=is_new_cue)
         else:
+            self._last_cue = None
             header_text.append(" 🎬 ", style="dim yellow on #1c1c1c")
             header_text.append("(no active cue) ", style="dim yellow on #1c1c1c")
 

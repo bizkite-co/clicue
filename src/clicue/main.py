@@ -618,6 +618,7 @@ def main(args=None):
 
     current_idx = 0
     is_paused = False
+    was_flashing_cue = False
 
     try:
         with KeyboardListener() as kbd:
@@ -694,6 +695,14 @@ def main(args=None):
                                 r0 = time.perf_counter()
                                 live.update(scroller.render(current_idx, is_paused=is_paused), refresh=True)
                                 perf_logger.record_render((time.perf_counter() - r0) * 1000.0)
+
+                    # Auto-refresh while cue flash highlight is active so it un-flashes on time even during silence
+                    if scroller.is_flashing_cue:
+                        live.update(scroller.render(current_idx, is_paused=is_paused), refresh=True)
+                        was_flashing_cue = True
+                    elif was_flashing_cue:
+                        live.update(scroller.render(current_idx, is_paused=is_paused), refresh=True)
+                        was_flashing_cue = False
 
                     if current_idx >= len(script.words):
                         break
