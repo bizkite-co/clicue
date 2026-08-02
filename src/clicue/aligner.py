@@ -10,7 +10,8 @@ class Aligner:
         threshold: float = 70.0,
         locality_penalty: float = 1.5,
         window_size: int = None,
-        perf_log: bool = False
+        perf_log: bool = False,
+        perf_logger = None
     ):
         self.script_words = script_words
         self.lower_words = [w.lower() for w in script_words]
@@ -19,6 +20,7 @@ class Aligner:
         self.threshold = threshold
         self.locality_penalty = locality_penalty
         self.perf_log = perf_log
+        self.perf_logger = perf_logger
         self.call_count = 0
         self.total_time_ms = 0.0
 
@@ -66,8 +68,12 @@ class Aligner:
         self.call_count += 1
         self.total_time_ms += elapsed_ms
 
+        if self.perf_logger:
+            self.perf_logger.record_align(clean_stt_text, self.current_index, elapsed_ms)
+
         if self.perf_log and self.call_count % 10 == 0:
             avg_ms = self.total_time_ms / self.call_count
             print(f"[PERF] Align call #{self.call_count}: {elapsed_ms:.2f}ms (avg: {avg_ms:.2f}ms) | STT: '{clean_stt_text}' -> Index {self.current_index}", file=sys.stderr)
 
         return self.current_index
+

@@ -5,7 +5,7 @@ from rich.padding import Padding
 from clicue.fountain import ParsedScript
 
 class TUIScroller:
-    def __init__(self, script: ParsedScript, window_size: int = 38, past_size: int = 9):
+    def __init__(self, script: ParsedScript, window_size: int = 38, past_size: int = 9, debug: bool = False, perf_logger = None):
         if isinstance(script, ParsedScript):
             self.script = script
         else:
@@ -17,6 +17,8 @@ class TUIScroller:
 
         self.window_size = window_size
         self.past_size = past_size
+        self.debug = debug
+        self.perf_logger = perf_logger
         self.console = Console()
 
     def _build_wrapped_lines(self, width: int):
@@ -65,13 +67,19 @@ class TUIScroller:
         """
         current_index = max(0, min(current_index, len(self.script) - 1)) if len(self.script) > 0 else 0
         
-        # 1. Header (Status Badge + Stage Cue)
+        # 1. Header (Status Badge + Stage Cue + Optional Latency Stats)
         header_text = Text()
 
         if is_paused:
             header_text.append("[CLICUE PAUSED ⏸] ", style="bold black on yellow")
         else:
             header_text.append("[CLICUE TRACKING ▶] ", style="bold white on green")
+
+        if self.debug and self.perf_logger:
+            stt_m = f"{self.perf_logger.latest_stt_ms:.0f}ms"
+            align_m = f"{self.perf_logger.latest_align_ms:.1f}ms"
+            render_m = f"{self.perf_logger.latest_render_ms:.1f}ms"
+            header_text.append(f"⚡ STT:{stt_m} Align:{align_m} Render:{render_m} ", style="bold cyan")
 
         active_cue = self.script.cues[current_index] if len(self.script.cues) > current_index else ""
         if active_cue:
@@ -80,6 +88,7 @@ class TUIScroller:
         else:
             header_text.append(" 🎬 ", style="dim yellow")
             header_text.append("(no active cue)", style="dim yellow")
+
 
         # 2. Line-Anchored Text Body (1 previous row max context)
         width = max(40, self.console.width - 2)

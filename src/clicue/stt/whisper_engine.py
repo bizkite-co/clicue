@@ -17,10 +17,11 @@ from clicue.stt.base import BaseSTTListener
 
 
 class WhisperSTTListener(BaseSTTListener):
-    def __init__(self, model_path="base.en", sample_rate=16000, device=None, compute_type="int8", hf_token=None):
+    def __init__(self, model_path="base.en", sample_rate=16000, device=None, compute_type="int8", hf_token=None, perf_logger=None):
         self.sample_rate = sample_rate
         self.device_id = device
         self.model_name = model_path if model_path and model_path != "model" else "base.en"
+        self.perf_logger = perf_logger
         token = hf_token or os.environ.get("HF_TOKEN")
         
         try:
@@ -33,7 +34,6 @@ class WhisperSTTListener(BaseSTTListener):
             print(f"Error loading Faster-Whisper model '{self.model_name}': {e}", file=sys.stderr)
             sys.exit(1)
 
-
         self.q = queue.Queue()
 
     def _audio_callback(self, indata, frames, time, status):
@@ -43,11 +43,16 @@ class WhisperSTTListener(BaseSTTListener):
 
     def listen_file(self, audio_file_path: str):
         """Processes a WAV audio file with Faster-Whisper."""
+        t0 = time.perf_counter()
         segments, _ = self.model.transcribe(audio_file_path, language="en", beam_size=1)
         for segment in segments:
             text = segment.text.strip()
             if text:
+                lat_ms = (time.perf_counter() - t0) * 1000.0
+                if self.perf_logger:
+                    self.perf_logger.record_stt(text, lat_ms)
                 yield text
+                t0 = time.perf_counter()
 
     def listen(self, device=None):
         target_device = device if device is not None else self.device_id
@@ -75,6 +80,7 @@ class WhisperSTTListener(BaseSTTListener):
                     if len(buffer_samples) >= min_samples:
                         audio_data = np.array(buffer_samples, dtype=np.float32)
                         
+                        t0 = time.perf_counter()
                         # Transcribe audio buffer
                         segments, _ = self.model.transcribe(
                             audio_data,
@@ -83,9 +89,12 @@ class WhisperSTTListener(BaseSTTListener):
                             vad_filter=True,
                             vad_parameters=dict(min_silence_duration_ms=300)
                         )
+                        lat_ms = (time.perf_counter() - t0) * 1000.0
                         
                         full_text = " ".join([seg.text.strip() for seg in segments if seg.text.strip()])
                         if full_text:
+                            if self.perf_logger:
+                                self.perf_logger.record_stt(full_text, lat_ms)
                             yield full_text
 
                         # Maintain rolling buffer overlap

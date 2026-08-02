@@ -195,9 +195,49 @@ def main(args=None):
                 print(f"  - {name} ({size_str})")
         return 0
 
+    # Support positional 'perf' or 'logs' subcommands
+    if args and args[0].lower() in ("perf", "logs", "perf-logs"):
+        from clicue.perf import list_log_sessions, purge_old_logs, get_logs_dir
+        cmd = args[0].lower()
+        sub_args = args[1:]
+        
+        sub = sub_args[0].lower() if sub_args else "list"
 
+        if sub == "purge":
+            days = 7
+            if len(sub_args) > 1 and sub_args[1].isdigit():
+                days = int(sub_args[1])
+            purged = purge_old_logs(max_age_days=days)
+            if not purged:
+                print(f"No log folders older than {days} days found to purge.")
+            else:
+                print(f"Purged {len(purged)} log folder(s) older than {days} days:")
+                for p_folder in purged:
+                    print(f"  - {p_folder}")
+            return 0
 
+        if sub == "last":
+            sessions = list_log_sessions()
+            if not sessions:
+                print(f"No performance log sessions found in {get_logs_dir()}")
+            else:
+                last_session = sessions[0]
+                print(f"Latest performance log ({last_session['date']}/{last_session['filename']}):")
+                with open(last_session['path'], 'r', encoding='utf-8') as f:
+                    print(f.read())
+            return 0
 
+        # Default: list log sessions
+        sessions = list_log_sessions()
+        logs_dir = get_logs_dir()
+        if not sessions:
+            print(f"No performance log sessions in {logs_dir}")
+        else:
+            print(f"Performance log sessions in {logs_dir}:")
+            for s in sessions[:10]:
+                size_str = f"{s['size_bytes'] / 1024:.1f} KB" if s['size_bytes'] >= 1024 else f"{s['size_bytes']} B"
+                print(f"  - [{s['date']}] {s['filename']} ({size_str}, {s['mtime'].strftime('%H:%M:%S')})")
+        return 0
 
     parser = argparse.ArgumentParser(description="clicue - teleprompter script scroller")
     parser.add_argument(
@@ -243,11 +283,6 @@ def main(args=None):
         type=float,
         default=None,
         help="Fuzzy match confidence threshold (0.0 - 100.0)."
-    )
-    parser.add_argument(
-        "--perf-log",
-        action="store_true",
-        help="Log performance metrics to stderr."
     )
     parser.add_argument(
         "--engine",
@@ -299,6 +334,22 @@ def main(args=None):
         action="store_true",
         help="List available audio input devices and exit."
     )
+    parser.add_argument(
+        "--perf-log",
+        action="store_true",
+        help="Enable performance logging to date-stamped folders in ~/.local/share/clicue/logs/."
+    )
+    parser.add_argument(
+        "--log-file",
+        default=None,
+        help="Path to custom performance log file."
+    )
+    parser.add_argument(
+        "--debug",
+        "-d",
+        action="store_true",
+        help="Display real-time STT, Aligner, and Render latency stats in TUI header."
+    )
     
     parsed_args = parser.parse_args(args)
 
@@ -318,6 +369,10 @@ def main(args=None):
     threshold = parsed_args.threshold or cfg["aligner"]["threshold"]
     locality_penalty = cfg["aligner"].get("locality_penalty", 1.5)
     perf_log = parsed_args.perf_log or cfg["debug"]["perf_log"]
+
+    from clicue.perf import PerfLogger
+    enable_perf = parsed_args.perf_log or bool(parsed_args.log_file) or parsed_args.debug or cfg.get("debug", {}).get("perf_log", False)
+    perf_logger = PerfLogger(enabled=enable_perf, custom_log_path=parsed_args.log_file)
 
     # Determine model shortcut / path
     model_input = None
@@ -355,10 +410,22 @@ def main(args=None):
         max_lookahead=max_lookahead,
         threshold=threshold,
         locality_penalty=locality_penalty,
-        perf_log=perf_log
+        perf_log=perf_log,
+        perf_logger=perf_logger
     )
-    scroller = TUIScroller(script, window_size=window_size, past_size=past_size)
-    listener = get_stt_listener(engine_name=engine_name, model_path=model_path, device=device_param)
+    scroller = TUIScroller(
+        script,
+        window_size=window_size,
+        past_size=past_size,
+        debug=parsed_args.debug,
+        perf_logger=perf_logger
+    )
+    listener = get_stt_listener(
+        engine_name=engine_name,
+        model_path=model_path,
+        device=device_param,
+        perf_logger=perf_logger
+    )
 
     
     audio_stream = listener.listen_file(parsed_args.audio_file) if parsed_args.audio_file else listener.listen()
@@ -374,15 +441,26 @@ def main(args=None):
                     key = kbd.get_key()
                     if key in (' ', 'p'):
                         is_paused = not is_paused
+                        r0 = time.perf_counter()
                         live.update(scroller.render(current_idx, is_paused=is_paused), refresh=True)
+                        perf_logger.record_render((time.perf_counter() - r0) * 1000.0)
+                    elif key == 'd':
+                        scroller.debug = not scroller.debug
+                        r0 = time.perf_counter()
+                        live.update(scroller.render(current_idx, is_paused=is_paused), refresh=True)
+                        perf_logger.record_render((time.perf_counter() - r0) * 1000.0)
                     elif key in ('LEFT', 'b'):
                         current_idx = max(0, current_idx - 5)
                         aligner.current_index = current_idx
+                        r0 = time.perf_counter()
                         live.update(scroller.render(current_idx, is_paused=is_paused), refresh=True)
+                        perf_logger.record_render((time.perf_counter() - r0) * 1000.0)
                     elif key in ('RIGHT', 'f'):
                         current_idx = min(len(script.words) - 1, current_idx + 5)
                         aligner.current_index = current_idx
+                        r0 = time.perf_counter()
                         live.update(scroller.render(current_idx, is_paused=is_paused), refresh=True)
+                        perf_logger.record_render((time.perf_counter() - r0) * 1000.0)
                     elif key == 'q':
                         break
 
@@ -391,15 +469,20 @@ def main(args=None):
                         new_idx = aligner.advance(text)
                         if new_idx != current_idx:
                             current_idx = new_idx
+                            r0 = time.perf_counter()
                             live.update(scroller.render(current_idx, is_paused=is_paused), refresh=True)
+                            perf_logger.record_render((time.perf_counter() - r0) * 1000.0)
 
                     if current_idx >= len(script.words):
                         break
     except KeyboardInterrupt:
         pass
+    finally:
+        perf_logger.close()
 
     return 0
 
 if __name__ == "__main__":
     main()
+
 

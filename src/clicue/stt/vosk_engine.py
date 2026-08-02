@@ -10,10 +10,11 @@ from clicue.stt.base import BaseSTTListener
 SetLogLevel(-1)
 
 class VoskSTTListener(BaseSTTListener):
-    def __init__(self, model_path="model", sample_rate=16000, device=None):
+    def __init__(self, model_path="model", sample_rate=16000, device=None, perf_logger=None):
         self.sample_rate = sample_rate
         self.device = device
         self.model_path = model_path
+        self.perf_logger = perf_logger
         try:
             self.model = Model(model_path)
         except Exception as e:
