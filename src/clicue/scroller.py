@@ -87,11 +87,11 @@ class TUIScroller:
 
         active_cue = self.script.cues[current_index] if len(self.script.cues) > current_index else ""
         if active_cue:
-            header_text.append(" 🎬 ", style="yellow")
-            header_text.append(active_cue, style="bold yellow")
+            header_text.append(" 🎬 ", style="yellow on #262626")
+            header_text.append(f"{active_cue} ", style="bold bright_yellow on #262626")
         else:
-            header_text.append(" 🎬 ", style="dim yellow")
-            header_text.append("(no active cue)", style="dim yellow")
+            header_text.append(" 🎬 ", style="dim yellow on #1c1c1c")
+            header_text.append("(no active cue) ", style="dim yellow on #1c1c1c")
 
 
         # 2. Line-Anchored Text Body (1 previous row max context)
