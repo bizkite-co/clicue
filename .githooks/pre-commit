@@ -1,0 +1,7 @@
+#!/usr/bin/env bash
+set -e
+
+echo "🔍 Running pre-commit quality checks..."
+make lint
+make test
+echo "✅ Pre-commit quality checks passed!"
