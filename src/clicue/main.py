@@ -132,6 +132,10 @@ class KeyboardListener:
                                 return 'LEFT'
                             elif ch3 == 'C':
                                 return 'RIGHT'
+                            elif ch3 == 'H':
+                                return 'HOME'
+                else:
+                    return 'ESC'
             return ch
         return None
 
@@ -429,56 +433,88 @@ def main(args=None):
     )
 
     
+    import queue
+    import threading
+
     audio_stream = listener.listen_file(parsed_args.audio_file) if parsed_args.audio_file else listener.listen()
+    audio_queue = queue.Queue()
+    stop_event = threading.Event()
+
+    def _audio_worker():
+        try:
+            for text in audio_stream:
+                if stop_event.is_set():
+                    break
+                audio_queue.put(text)
+        except Exception:
+            pass
+
+    t = threading.Thread(target=_audio_worker, daemon=True)
+    t.start()
 
     current_idx = 0
     is_paused = False
 
     try:
         with KeyboardListener() as kbd:
-            with Live(scroller.render(0, is_paused=False), refresh_per_second=15, auto_refresh=False, screen=True) as live:
-                for text in audio_stream:
-                    # Check non-blocking hotkey input
+            with Live(scroller.render(0, is_paused=False), refresh_per_second=20, auto_refresh=False, screen=True) as live:
+                while True:
+                    # 1. Non-blocking keypress handling
                     key = kbd.get_key()
-                    if key in (' ', 'p'):
+                    if key in ('q', 'Q', 'ESC'):
+                        stop_event.set()
+                        break
+                    elif key in ('r', 'R', '0', 'HOME'):
+                        current_idx = 0
+                        aligner.current_index = 0
+                        r0 = time.perf_counter()
+                        live.update(scroller.render(current_idx, is_paused=is_paused), refresh=True)
+                        perf_logger.record_render((time.perf_counter() - r0) * 1000.0)
+                    elif key in (' ', 'p', 'P'):
                         is_paused = not is_paused
                         r0 = time.perf_counter()
                         live.update(scroller.render(current_idx, is_paused=is_paused), refresh=True)
                         perf_logger.record_render((time.perf_counter() - r0) * 1000.0)
-                    elif key == 'd':
+                    elif key in ('d', 'D'):
                         scroller.debug = not scroller.debug
                         r0 = time.perf_counter()
                         live.update(scroller.render(current_idx, is_paused=is_paused), refresh=True)
                         perf_logger.record_render((time.perf_counter() - r0) * 1000.0)
-                    elif key in ('LEFT', 'b'):
+                    elif key in ('LEFT', 'b', 'B'):
                         current_idx = max(0, current_idx - 5)
                         aligner.current_index = current_idx
                         r0 = time.perf_counter()
                         live.update(scroller.render(current_idx, is_paused=is_paused), refresh=True)
                         perf_logger.record_render((time.perf_counter() - r0) * 1000.0)
-                    elif key in ('RIGHT', 'f'):
+                    elif key in ('RIGHT', 'f', 'F'):
                         current_idx = min(len(script.words) - 1, current_idx + 5)
                         aligner.current_index = current_idx
                         r0 = time.perf_counter()
                         live.update(scroller.render(current_idx, is_paused=is_paused), refresh=True)
                         perf_logger.record_render((time.perf_counter() - r0) * 1000.0)
-                    elif key == 'q':
-                        break
 
-                    # Advance cursor with STT only if not paused
-                    if not is_paused:
-                        new_idx = aligner.advance(text)
-                        if new_idx != current_idx:
-                            current_idx = new_idx
-                            r0 = time.perf_counter()
-                            live.update(scroller.render(current_idx, is_paused=is_paused), refresh=True)
-                            perf_logger.record_render((time.perf_counter() - r0) * 1000.0)
+                    # 2. Non-blocking audio queue processing
+                    while not audio_queue.empty():
+                        text = audio_queue.get_nowait()
+                        if not is_paused:
+                            new_idx = aligner.advance(text)
+                            if new_idx != current_idx:
+                                current_idx = new_idx
+                                r0 = time.perf_counter()
+                                live.update(scroller.render(current_idx, is_paused=is_paused), refresh=True)
+                                perf_logger.record_render((time.perf_counter() - r0) * 1000.0)
 
                     if current_idx >= len(script.words):
                         break
+
+                    if not t.is_alive() and audio_queue.empty():
+                        break
+
+                    time.sleep(0.02)
     except KeyboardInterrupt:
         pass
     finally:
+        stop_event.set()
         perf_logger.close()
 
     return 0

@@ -47,6 +47,28 @@ class TestCLI(unittest.TestCase):
             
         self.assertEqual(result, 0)
 
+    @patch('clicue.main.KeyboardListener.get_key')
+    @patch('clicue.main.get_stt_listener')
+    def test_hotkey_quit_and_restart(self, mock_get_stt_listener, mock_get_key):
+        mock_listener = MagicMock()
+        mock_listener.listen.return_value = ["speech"]
+        mock_get_stt_listener.return_value = mock_listener
+
+        # Simulate pressing 'r' (restart) then 'q' (quit)
+        mock_get_key.side_effect = ['r', 'q']
+
+        import tempfile
+        with tempfile.NamedTemporaryFile(mode='w', delete=False) as f:
+            f.write("one two three four five six")
+            temp_path = f.name
+
+        try:
+            with patch('sys.stdout', new=io.StringIO()):
+                res = main.main([temp_path])
+            self.assertEqual(res, 0)
+        finally:
+            os.remove(temp_path)
+
 
 
 if __name__ == '__main__':
