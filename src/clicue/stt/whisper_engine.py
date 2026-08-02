@@ -90,18 +90,13 @@ class WhisperSTTListener(BaseSTTListener):
                         self.buffer_samples.extend(block.flatten())
 
                     if len(self.buffer_samples) >= min_samples:
-                        # Cap max audio buffer length to 2.0s to prevent stale buffer buildup during pauses
-                        max_buffer_len = int(self.sample_rate * 2.0)
-                        if len(self.buffer_samples) > max_buffer_len:
-                            self.buffer_samples = self.buffer_samples[-max_buffer_len:]
-
                         audio_data = np.array(self.buffer_samples, dtype=np.float32)
                         
-                        # 1. Local RMS Energy Silence Gate (0.001ms instantaneous check; lowered to 0.0008 for soft voices)
+                        # 1. Local RMS Energy Silence Gate (0.001ms check; 0.0005 for quiet/soft voices)
                         rms = np.sqrt(np.mean(audio_data**2))
-                        if rms < 0.0008:
+                        if rms < 0.0005:
                             self.buffer_samples = self.buffer_samples[-int(self.sample_rate * 0.2):]
-                            time.sleep(0.1)
+                            time.sleep(0.05)
                             continue
 
                         # 2. Peak Audio Normalization for quiet mic inputs
@@ -124,12 +119,17 @@ class WhisperSTTListener(BaseSTTListener):
                         if full_text and not self.reset_requested:
                             if self.perf_logger:
                                 self.perf_logger.record_stt(full_text, lat_ms)
+                            # Recognized speech! Trim buffer to 0.2s trailing overlap for next utterance
+                            self.buffer_samples = self.buffer_samples[-int(self.sample_rate * 0.2):]
                             yield full_text
+                        else:
+                            # Mid-phrase or VAD waiting: preserve buffer so complete phrases build naturally.
+                            # Only trim if buffer exceeds 3.0s max during long pauses/noise.
+                            max_buffer_len = int(self.sample_rate * 3.0)
+                            if len(self.buffer_samples) > max_buffer_len:
+                                self.buffer_samples = self.buffer_samples[-int(self.sample_rate * 0.5):]
 
-                        # Always trim buffer to 0.2s trailing overlap after transcription to prevent duplicate re-transcription of silence
-                        self.buffer_samples = self.buffer_samples[-int(self.sample_rate * 0.2):]
-
-                    time.sleep(0.1)
+                    time.sleep(0.05)
 
         except sd.PortAudioError as e:
             print(f"\n[Error] Could not open audio input device ({target_device}): {e}", file=sys.stderr)
