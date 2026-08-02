@@ -673,6 +673,12 @@ def main(args=None):
                         r0 = time.perf_counter()
                         live.update(scroller.render(current_idx, is_paused=is_paused), refresh=True)
                         perf_logger.record_render((time.perf_counter() - r0) * 1000.0)
+                    elif key in ('l', 'L'):
+                        perf_logger.toggle_disk_logging()
+                        scroller.debug = True
+                        r0 = time.perf_counter()
+                        live.update(scroller.render(current_idx, is_paused=is_paused), refresh=True)
+                        perf_logger.record_render((time.perf_counter() - r0) * 1000.0)
                     elif key in ('LEFT', 'b', 'B'):
                         current_idx = max(0, current_idx - 5)
                         aligner.current_index = current_idx

@@ -90,18 +90,23 @@ class WhisperSTTListener(BaseSTTListener):
                         self.buffer_samples.extend(block.flatten())
 
                     if len(self.buffer_samples) >= min_samples:
+                        # Cap max audio buffer length to 2.0s to prevent stale buffer buildup during pauses
+                        max_buffer_len = int(self.sample_rate * 2.0)
+                        if len(self.buffer_samples) > max_buffer_len:
+                            self.buffer_samples = self.buffer_samples[-max_buffer_len:]
+
                         audio_data = np.array(self.buffer_samples, dtype=np.float32)
                         
-                        # 1. Local RMS Energy Silence Gate (0.001ms instantaneous check)
+                        # 1. Local RMS Energy Silence Gate (0.001ms instantaneous check; lowered to 0.0008 for soft voices)
                         rms = np.sqrt(np.mean(audio_data**2))
-                        if rms < 0.003:
+                        if rms < 0.0008:
                             self.buffer_samples = self.buffer_samples[-int(self.sample_rate * 0.2):]
                             time.sleep(0.1)
                             continue
 
                         # 2. Peak Audio Normalization for quiet mic inputs
                         max_val = np.max(np.abs(audio_data))
-                        if 0.01 < max_val < 0.8:
+                        if 0.005 < max_val < 0.8:
                             audio_data = (audio_data / max_val) * 0.8
 
                         t0 = time.perf_counter()

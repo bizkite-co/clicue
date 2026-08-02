@@ -100,6 +100,28 @@ class PerfLogger:
             print(f"Warning: Could not open perf log file '{self.log_path}': {e}", file=sys.stderr)
             self.enabled = False
 
+    def toggle_disk_logging(self) -> bool:
+        """
+        Dynamically enables or disables logging to disk during a live session.
+        Returns True if disk logging is now ACTIVE, False if OFF.
+        """
+        if self.enabled and self.log_file:
+            self.close()
+            self.enabled = False
+            return False
+        else:
+            self.enabled = True
+            now_str = datetime.now().strftime("%Y-%m-%d_%H%M%S")
+            self.log_path = get_logs_dir() / f"clicue_{now_str}.log"
+            try:
+                self.log_file = open(self.log_path, "a", encoding="utf-8")
+                self.log("SESSION_START", f"Clicue performance session started dynamically at {datetime.now().isoformat()}")
+                return True
+            except Exception as e:
+                print(f"Warning: Could not open perf log file '{self.log_path}': {e}", file=sys.stderr)
+                self.enabled = False
+                return False
+
     def log(self, event_type: str, details: str):
         if not self.enabled or not self.log_file:
             return
