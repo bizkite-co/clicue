@@ -1,7 +1,39 @@
 from rich.console import Console, Group
 from rich.text import Text
 
-from clicue.fountain import ParsedScript
+from clicue.fountain import ParsedScript, process_word_emphasis
+
+
+def append_styled_cue(header_text: Text, cue: str):
+    """
+    Parses inline markdown syntax (`code`, *italic*, **bold**) in cue strings
+    and appends them to header_text with dark grey background (#262626).
+    """
+    header_text.append(" 🎬 ", style="yellow on #262626")
+    cue_words = cue.split()
+    in_italic = False
+    in_bold = False
+    in_code = False
+
+    for i, raw_w in enumerate(cue_words):
+        clean_w, style_str, in_italic, in_bold, in_code = process_word_emphasis(raw_w, in_italic, in_bold, in_code)
+        
+        styles = ["on #262626"]
+        if "cyan" in style_str:
+            styles.append("bold cyan")
+        elif "bold" in style_str:
+            styles.append("bold white")
+        else:
+            styles.append("bold bright_yellow")
+
+        if "italic" in style_str:
+            styles.append("italic")
+
+        header_text.append(clean_w, style=" ".join(styles))
+        if i < len(cue_words) - 1:
+            header_text.append(" ", style="on #262626")
+
+    header_text.append(" ", style="on #262626")
 
 
 class TUIScroller:
@@ -87,8 +119,7 @@ class TUIScroller:
 
         active_cue = self.script.cues[current_index] if len(self.script.cues) > current_index else ""
         if active_cue:
-            header_text.append(" 🎬 ", style="yellow on #262626")
-            header_text.append(f"{active_cue} ", style="bold bright_yellow on #262626")
+            append_styled_cue(header_text, active_cue)
         else:
             header_text.append(" 🎬 ", style="dim yellow on #1c1c1c")
             header_text.append("(no active cue) ", style="dim yellow on #1c1c1c")
