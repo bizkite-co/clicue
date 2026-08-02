@@ -20,8 +20,8 @@ def get_logs_dir() -> Path:
 
 def purge_old_logs(max_age_days: int = 7) -> list[str]:
     """
-    Purges date-stamped log folders (YYYY-MM-DD) older than max_age_days.
-    Returns list of purged folder names.
+    Purges date-stamped log files (clicue_YYYY-MM-DD_HHMMSS.log) or log folders older than max_age_days.
+    Returns list of purged item names.
     """
     logs_dir = get_logs_dir()
     cutoff_date = datetime.now() - timedelta(days=max_age_days)
@@ -30,37 +30,41 @@ def purge_old_logs(max_age_days: int = 7) -> list[str]:
     if not logs_dir.exists():
         return purged
 
-    for item in list(logs_dir.iterdir()):
-        if item.is_dir():
+    for item in list(logs_dir.rglob("*")):
+        if item.is_file() and item.suffix == ".log":
+            mtime = datetime.fromtimestamp(item.stat().st_mtime)
+            if mtime.date() < cutoff_date.date():
+                item.unlink()
+                purged.append(item.name)
+        elif item.is_dir() and item != logs_dir:
             try:
                 folder_date = datetime.strptime(item.name, "%Y-%m-%d")
                 if folder_date.date() < cutoff_date.date():
                     shutil.rmtree(item)
                     purged.append(item.name)
             except ValueError:
-                # Not a YYYY-MM-DD folder name, ignore
                 pass
+
     return purged
 
 def list_log_sessions() -> list[dict]:
-    """Lists all available performance log files across date folders."""
+    """Lists all available performance log files in ~/.local/share/clicue/logs/."""
     logs_dir = get_logs_dir()
     sessions = []
     if not logs_dir.exists():
         return sessions
 
-    for date_folder in sorted(logs_dir.iterdir(), reverse=True):
-        if date_folder.is_dir():
-            for log_file in sorted(date_folder.glob("*.log"), reverse=True):
-                size_bytes = log_file.stat().st_size
-                mtime = datetime.fromtimestamp(log_file.stat().st_mtime)
-                sessions.append({
-                    "date": date_folder.name,
-                    "filename": log_file.name,
-                    "path": log_file,
-                    "size_bytes": size_bytes,
-                    "mtime": mtime
-                })
+    log_files = sorted(logs_dir.rglob("*.log"), key=lambda p: p.stat().st_mtime, reverse=True)
+    for log_file in log_files:
+        size_bytes = log_file.stat().st_size
+        mtime = datetime.fromtimestamp(log_file.stat().st_mtime)
+        sessions.append({
+            "date": mtime.strftime("%Y-%m-%d"),
+            "filename": log_file.name,
+            "path": log_file,
+            "size_bytes": size_bytes,
+            "mtime": mtime
+        })
     return sessions
 
 class PerfLogger:
@@ -78,7 +82,7 @@ class PerfLogger:
         if not self.enabled:
             return
 
-        # Auto-purge logs older than 7 days on startup
+        # Auto-purge log files older than 7 days on startup
         purge_old_logs(max_age_days=7)
 
         if custom_log_path:
@@ -86,11 +90,8 @@ class PerfLogger:
             p.parent.mkdir(parents=True, exist_ok=True)
             self.log_path = p
         else:
-            today_str = datetime.now().strftime("%Y-%m-%d")
-            today_dir = get_logs_dir() / today_str
-            today_dir.mkdir(parents=True, exist_ok=True)
-            time_str = datetime.now().strftime("%H%M%S")
-            self.log_path = today_dir / f"session_{time_str}.log"
+            now_str = datetime.now().strftime("%Y-%m-%d_%H%M%S")
+            self.log_path = get_logs_dir() / f"clicue_{now_str}.log"
 
         try:
             self.log_file = open(self.log_path, "a", encoding="utf-8")
