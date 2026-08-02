@@ -99,11 +99,12 @@ While `clicue` is running, the keyboard is monitored with zero-latency non-block
 
 | Key Shortcut | Action |
 | :--- | :--- |
-| **`r`** / **`0`** / **`Home`** | **Instant Restart**: Resets teleprompter cursor to word 0 and flushes audio buffers. |
+| **`r`** / **`0`** / **`Home`** | **Instant Reload**: Re-opens script file from disk, resets cursor to word 0, and flushes audio buffers. |
 | **`q`** / **`Esc`** | **Instant Quit**: Exits `clicue` immediately. |
-| **`Space`** / **`p`** | **Pause / Resume**: Toggles auto-scrolling pause state. |
-| **`Left`** / **`b`** | **Seek Backward**: Moves cursor back 5 words. |
-| **`Right`** / **`f`** | **Seek Forward**: Moves cursor forward 5 words. |
+| **`Space`** | **Pause / Resume**: Toggles auto-scrolling pause state. |
+| **`Left`** / **`b`** / **`h`** | **Seek Backward**: Moves cursor back 5 words (VIM `h` / `b`). |
+| **`Right`** / **`f`** / **`l`** | **Seek Forward**: Moves cursor forward 5 words (VIM `l` / `f`). |
+| **`p`** | **Toggle Performance Logging**: Enables/disables session logging to `~/.local/share/clicue/logs/`. |
 | **`d`** | **Toggle Debug Overlay**: Displays live STT, Aligner, and Render latency stats in header. |
 
 ---

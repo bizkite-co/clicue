@@ -151,10 +151,11 @@ def print_custom_help():
     console.print("  [cyan]-V, --version[/cyan]         Show clicue version details and exit.\n")
 
     console.print("[bold yellow]LIVE TUI SHORTCUTS:[/bold yellow]")
-    console.print("  [bold white]r / 0 / Home[/bold white]       Restart teleprompter from word 0 & flush audio buffers")
+    console.print("  [bold white]r / 0 / Home[/bold white]       Reload script & restart teleprompter from word 0")
     console.print("  [bold white]q / Esc[/bold white]            Quit teleprompter immediately")
-    console.print("  [bold white]Space / p[/bold white]          Pause / Resume auto-scrolling")
-    console.print("  [bold white]Left / Right[/bold white]        Seek backward / forward 5 words")
+    console.print("  [bold white]Space[/bold white]              Pause / Resume auto-scrolling")
+    console.print("  [bold white]Left / Right / h / l[/bold white] Seek backward / forward 5 words (VIM h/l)")
+    console.print("  [bold white]p[/bold white]                  Toggle session performance disk logging")
     console.print("  [bold white]d[/bold white]                  Toggle live latency debug header overlay\n")
 
 def print_version_details():
@@ -663,8 +664,14 @@ def main(args=None):
                         r0 = time.perf_counter()
                         live.update(scroller.render(current_idx, is_paused=is_paused), refresh=True)
                         perf_logger.record_render((time.perf_counter() - r0) * 1000.0)
-                    elif key in (' ', 'p', 'P'):
+                    elif key in (' ', 'space'):
                         is_paused = not is_paused
+                        r0 = time.perf_counter()
+                        live.update(scroller.render(current_idx, is_paused=is_paused), refresh=True)
+                        perf_logger.record_render((time.perf_counter() - r0) * 1000.0)
+                    elif key in ('p', 'P'):
+                        perf_logger.toggle_disk_logging()
+                        scroller.debug = True
                         r0 = time.perf_counter()
                         live.update(scroller.render(current_idx, is_paused=is_paused), refresh=True)
                         perf_logger.record_render((time.perf_counter() - r0) * 1000.0)
@@ -673,19 +680,13 @@ def main(args=None):
                         r0 = time.perf_counter()
                         live.update(scroller.render(current_idx, is_paused=is_paused), refresh=True)
                         perf_logger.record_render((time.perf_counter() - r0) * 1000.0)
-                    elif key in ('l', 'L'):
-                        perf_logger.toggle_disk_logging()
-                        scroller.debug = True
-                        r0 = time.perf_counter()
-                        live.update(scroller.render(current_idx, is_paused=is_paused), refresh=True)
-                        perf_logger.record_render((time.perf_counter() - r0) * 1000.0)
-                    elif key in ('LEFT', 'b', 'B'):
+                    elif key in ('LEFT', 'b', 'B', 'h', 'H'):
                         current_idx = max(0, current_idx - 5)
                         aligner.current_index = current_idx
                         r0 = time.perf_counter()
                         live.update(scroller.render(current_idx, is_paused=is_paused), refresh=True)
                         perf_logger.record_render((time.perf_counter() - r0) * 1000.0)
-                    elif key in ('RIGHT', 'f', 'F'):
+                    elif key in ('RIGHT', 'f', 'F', 'l', 'L'):
                         current_idx = min(len(script.words) - 1, current_idx + 5)
                         aligner.current_index = current_idx
                         r0 = time.perf_counter()
