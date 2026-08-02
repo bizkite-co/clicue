@@ -10,6 +10,18 @@ from clicue import main
 
 
 class TestCLI(unittest.TestCase):
+    def setUp(self):
+        import tempfile
+        from pathlib import Path
+        self.temp_dir = tempfile.TemporaryDirectory()
+        self.fake_last_file = Path(self.temp_dir.name) / "last_script.txt"
+        self.patcher = patch('clicue.main.get_last_script_candidates', return_value=[self.fake_last_file])
+        self.patcher.start()
+
+    def tearDown(self):
+        self.patcher.stop()
+        self.temp_dir.cleanup()
+
     def test_parse_words_from_file(self):
         fake_file = io.StringIO("This is a test script\nwith some words.")
         words = main.parse_words_from_file(fake_file)

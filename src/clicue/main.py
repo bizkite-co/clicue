@@ -536,6 +536,7 @@ def main(args=None):
         last_p = get_last_script()
         if last_p:
             active_script_path = last_p
+            save_last_script(last_p)
             Console().print(f"[bold cyan]Continuing last script:[/bold cyan] {last_p}")
             target_file = open(last_p, "r", encoding="utf-8")
             should_close = True
