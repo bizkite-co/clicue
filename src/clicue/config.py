@@ -20,6 +20,7 @@ DEFAULT_CONFIG: dict[str, dict[str, Any]] = {
     "audio": {
         "sample_rate": 16000,
         "model_path": "model",
+        "cpu_threads": 2,
     },
     "debug": {
         "perf_log": False,

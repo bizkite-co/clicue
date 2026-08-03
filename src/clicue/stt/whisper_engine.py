@@ -18,19 +18,22 @@ from clicue.stt.base import BaseSTTListener
 
 
 class WhisperSTTListener(BaseSTTListener):
-    def __init__(self, model_path="base.en", sample_rate=16000, device=None, compute_type="int8", hf_token=None, perf_logger=None):
+    def __init__(self, model_path="base.en", sample_rate=16000, device=None, compute_type="int8", hf_token=None, perf_logger=None, cpu_threads=2):
         self.sample_rate = sample_rate
         self.device_id = device
         self.model_name = model_path if model_path and model_path != "model" else "base.en"
         self.perf_logger = perf_logger
         token = hf_token or os.environ.get("HF_TOKEN")
-        
+
         try:
-            # Load Whisper model (int8 quantization for lightning-fast CPU inference)
+            # Load Whisper model (int8 quantization for lightning-fast CPU inference).
+            # cpu_threads caps CTranslate2's intra-op thread pool: faster-whisper's own
+            # default (0) lets it size itself to the machine, which is what produces
+            # the periodic multi-core CPU spikes on every transcribe() call.
             kwargs = {}
             if token:
                 kwargs["auth_token"] = token
-            self.model = WhisperModel(self.model_name, device="cpu", compute_type=compute_type, **kwargs)
+            self.model = WhisperModel(self.model_name, device="cpu", compute_type=compute_type, cpu_threads=cpu_threads, **kwargs)
         except Exception as e:
             print(f"Error loading Faster-Whisper model '{self.model_name}': {e}", file=sys.stderr)
             sys.exit(1)

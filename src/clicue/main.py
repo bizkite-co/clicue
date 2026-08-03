@@ -1,4 +1,5 @@
 import argparse
+import bisect
 import json
 import os
 import pathlib
@@ -113,6 +114,49 @@ def parse_script_from_file(file_obj, raw=False) -> ParsedScript:
 def parse_words_from_file(file_obj, raw=False):
     return parse_script_from_file(file_obj, raw).words
 
+
+def find_search_match(words, pattern_str, start_idx, direction=1):
+    """
+    Search script words for pattern_str (a Python `re` regex, case-insensitive),
+    starting just after (direction=1) or before (direction=-1) start_idx,
+    wrapping around the document if no match is found in that direction.
+    Returns the matching word index, or None on invalid pattern / no match.
+    """
+    if not words:
+        return None
+    try:
+        pattern = re.compile(pattern_str, re.IGNORECASE)
+    except re.error:
+        return None
+
+    offsets = []
+    pos = 0
+    for w in words:
+        offsets.append(pos)
+        pos += len(w) + 1
+    full_text = " ".join(words)
+
+    def offset_to_word_idx(off):
+        i = bisect.bisect_right(offsets, off) - 1
+        return max(0, min(i, len(words) - 1))
+
+    if direction >= 0:
+        search_from = offsets[min(start_idx + 1, len(words) - 1)]
+        m = pattern.search(full_text, search_from) or pattern.search(full_text)
+        return offset_to_word_idx(m.start()) if m else None
+    else:
+        search_before = offsets[start_idx]
+        last_match = None
+        for m in pattern.finditer(full_text):
+            if m.start() >= search_before:
+                break
+            last_match = m
+        if last_match is None:
+            for m in pattern.finditer(full_text):
+                last_match = m
+        return offset_to_word_idx(last_match.start()) if last_match else None
+
+
 from rich.console import Console
 
 
@@ -142,6 +186,7 @@ def print_custom_help():
     console.print("  [cyan]-c, --continue[/cyan]        Re-open and continue the last-used script file.")
     console.print("  [cyan]--whisper[/cyan]             Shortcut for Faster-Whisper neural STT engine.")
     console.print("  [cyan]--engine[/cyan] <name>        STT engine plugin ('vosk' or 'whisper'). Default: vosk.")
+    console.print("  [cyan]--cpu-threads[/cyan] <n>      Cap Faster-Whisper inference threads to limit CPU spikes. Default: 2.")
     console.print("  [cyan]--model[/cyan] <name>         Model shortcut ('vosk-small', 'vosk-full', 'base.en', 'tiny.en').")
     console.print("  [cyan]-d, --debug[/cyan]           Display real-time STT, Aligner, and Render latency in header.")
     console.print("  [cyan]--perf-log[/cyan]            Enable date-stamped session performance logging.")
@@ -155,6 +200,8 @@ def print_custom_help():
     console.print("  [bold white]q / Esc[/bold white]            Quit teleprompter immediately")
     console.print("  [bold white]Space[/bold white]              Pause / Resume auto-scrolling")
     console.print("  [bold white]Left / Right / h / l[/bold white] Seek backward / forward 5 words (VIM h/l)")
+    console.print("  [bold white]/[/bold white]                  Search script for text/regex (VIM /), Enter to jump, Esc to cancel")
+    console.print("  [bold white]n / N[/bold white]              Repeat last search forward / backward (VIM n/N)")
     console.print("  [bold white]p[/bold white]                  Toggle session performance disk logging")
     console.print("  [bold white]d[/bold white]                  Toggle live latency debug header overlay\n")
 
@@ -430,6 +477,12 @@ def main(args=None):
         help="Model name shortcut (e.g. 'vosk-full', 'vosk-small', 'base.en', 'tiny.en') or folder path."
     )
     parser.add_argument(
+        "--cpu-threads",
+        type=int,
+        default=None,
+        help="Cap Faster-Whisper's inference thread pool to limit periodic CPU spikes (default: 2)."
+    )
+    parser.add_argument(
         "--vosk-full",
         action="store_true",
         help="Shortcut to use the full 1.8GB Vosk model (vosk-full)."
@@ -591,12 +644,19 @@ def main(args=None):
         debug=parsed_args.debug,
         perf_logger=perf_logger
     )
-    listener = get_stt_listener(
+    listener_kwargs = dict(
         engine_name=engine_name,
         model_path=model_path,
         device=device_param,
         perf_logger=perf_logger
     )
+    if engine_name.lower() in ("whisper", "faster-whisper"):
+        listener_kwargs["cpu_threads"] = (
+            parsed_args.cpu_threads
+            if parsed_args.cpu_threads is not None
+            else cfg.get("audio", {}).get("cpu_threads", 2)
+        )
+    listener = get_stt_listener(**listener_kwargs)
 
     
     import queue
@@ -621,6 +681,7 @@ def main(args=None):
     current_idx = 0
     is_paused = False
     was_flashing_cue = False
+    current_search_pattern = None
 
     try:
         with KeyboardListener() as kbd:
@@ -670,8 +731,7 @@ def main(args=None):
                         live.update(scroller.render(current_idx, is_paused=is_paused), refresh=True)
                         perf_logger.record_render((time.perf_counter() - r0) * 1000.0)
                     elif key in ('p', 'P'):
-                        perf_logger.toggle_disk_logging()
-                        scroller.debug = True
+                        scroller.debug = perf_logger.toggle_disk_logging()
                         r0 = time.perf_counter()
                         live.update(scroller.render(current_idx, is_paused=is_paused), refresh=True)
                         perf_logger.record_render((time.perf_counter() - r0) * 1000.0)
@@ -689,6 +749,57 @@ def main(args=None):
                     elif key in ('RIGHT', 'f', 'F', 'l', 'L'):
                         current_idx = min(len(script.words) - 1, current_idx + 5)
                         aligner.current_index = current_idx
+                        r0 = time.perf_counter()
+                        live.update(scroller.render(current_idx, is_paused=is_paused), refresh=True)
+                        perf_logger.record_render((time.perf_counter() - r0) * 1000.0)
+                    elif key == '/':
+                        query = ""
+                        while True:
+                            r0 = time.perf_counter()
+                            live.update(
+                                scroller.render(current_idx, is_paused=is_paused, search_prompt="/" + query),
+                                refresh=True,
+                            )
+                            perf_logger.record_render((time.perf_counter() - r0) * 1000.0)
+
+                            skey = kbd.get_key()
+                            if skey is None:
+                                time.sleep(0.02)
+                                continue
+                            if skey in ('\r', '\n'):
+                                if query:
+                                    current_search_pattern = query
+                                    match_idx = find_search_match(script.words, query, current_idx, direction=1)
+                                    if match_idx is not None:
+                                        current_idx = match_idx
+                                        aligner.current_index = current_idx
+                                break
+                            elif skey == 'ESC':
+                                break
+                            elif skey in ('\x7f', '\x08'):
+                                query = query[:-1]
+                            elif len(skey) == 1 and skey.isprintable():
+                                query += skey
+
+                        # Discard STT results queued while typing the search query
+                        with audio_queue.mutex:
+                            audio_queue.queue.clear()
+                        r0 = time.perf_counter()
+                        live.update(scroller.render(current_idx, is_paused=is_paused), refresh=True)
+                        perf_logger.record_render((time.perf_counter() - r0) * 1000.0)
+                    elif key == 'n' and current_search_pattern:
+                        match_idx = find_search_match(script.words, current_search_pattern, current_idx, direction=1)
+                        if match_idx is not None:
+                            current_idx = match_idx
+                            aligner.current_index = current_idx
+                        r0 = time.perf_counter()
+                        live.update(scroller.render(current_idx, is_paused=is_paused), refresh=True)
+                        perf_logger.record_render((time.perf_counter() - r0) * 1000.0)
+                    elif key == 'N' and current_search_pattern:
+                        match_idx = find_search_match(script.words, current_search_pattern, current_idx, direction=-1)
+                        if match_idx is not None:
+                            current_idx = match_idx
+                            aligner.current_index = current_idx
                         r0 = time.perf_counter()
                         live.update(scroller.render(current_idx, is_paused=is_paused), refresh=True)
                         perf_logger.record_render((time.perf_counter() - r0) * 1000.0)

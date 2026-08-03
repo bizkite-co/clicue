@@ -102,7 +102,7 @@ class TUIScroller:
         self._cached_lines = lines
         return lines
 
-    def render(self, current_index: int, is_paused: bool = False) -> Group:
+    def render(self, current_index: int, is_paused: bool = False, search_prompt: str | None = None) -> Group:
         """
         Renders the TUI layout:
         - Header: Status badge ([CLICUE TRACKING ▶] or [CLICUE PAUSED ⏸]) and active stage cue.
@@ -111,14 +111,21 @@ class TUIScroller:
         """
         import time
         current_index = max(0, min(current_index, len(self.script) - 1)) if len(self.script) > 0 else 0
-        
+
         # 1. Header (Status Badge + Stage Cue + Optional Latency Stats)
         header_text = Text()
 
+        if search_prompt is not None:
+            header_text.append(f" {search_prompt} ", style="bold black on bright_yellow")
+
+        total_words = len(self.script)
+        progress_pct = round(current_index / (total_words - 1) * 100) if total_words > 1 else 100
+        progress_str = f"{progress_pct:3d}%"
+
         if is_paused:
-            header_text.append("[CLICUE PAUSED ⏸] ", style="bold black on yellow")
+            header_text.append(f"[CLICUE PAUSED {progress_str} ⏸] ", style="bold black on yellow")
         else:
-            header_text.append("[CLICUE TRACKING ▶] ", style="bold white on green")
+            header_text.append(f"[CLICUE TRACKING {progress_str} ▶] ", style="bold white on green")
 
         if self.debug and self.perf_logger:
             stt_m = f"{self.perf_logger.latest_stt_ms:.0f}ms"
