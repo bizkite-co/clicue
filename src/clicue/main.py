@@ -203,7 +203,8 @@ def print_custom_help():
     console.print("  [bold white]/[/bold white]                  Search script for text/regex (VIM /), Enter to jump, Esc to cancel")
     console.print("  [bold white]n / N[/bold white]              Repeat last search forward / backward (VIM n/N)")
     console.print("  [bold white]p[/bold white]                  Toggle session performance disk logging")
-    console.print("  [bold white]d[/bold white]                  Toggle live latency debug header overlay\n")
+    console.print("  [bold white]d[/bold white]                  Toggle live latency debug header overlay")
+    console.print("  [bold white]?[/bold white]                  Show/hide full-screen shortcut reference\n")
 
 def print_version_details():
     console = Console()
@@ -800,6 +801,24 @@ def main(args=None):
                         if match_idx is not None:
                             current_idx = match_idx
                             aligner.current_index = current_idx
+                        r0 = time.perf_counter()
+                        live.update(scroller.render(current_idx, is_paused=is_paused), refresh=True)
+                        perf_logger.record_render((time.perf_counter() - r0) * 1000.0)
+                    elif key == '?':
+                        r0 = time.perf_counter()
+                        live.update(scroller.render_help(), refresh=True)
+                        perf_logger.record_render((time.perf_counter() - r0) * 1000.0)
+                        while True:
+                            skey = kbd.get_key()
+                            if skey is None:
+                                time.sleep(0.02)
+                                continue
+                            if skey in ('ESC', '?'):
+                                break
+
+                        # Discard STT results queued while the help overlay was open
+                        with audio_queue.mutex:
+                            audio_queue.queue.clear()
                         r0 = time.perf_counter()
                         live.update(scroller.render(current_idx, is_paused=is_paused), refresh=True)
                         perf_logger.record_render((time.perf_counter() - r0) * 1000.0)

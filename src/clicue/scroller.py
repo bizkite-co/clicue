@@ -1,7 +1,21 @@
 from rich.console import Console, Group
+from rich.table import Table
 from rich.text import Text
 
 from clicue.fountain import ParsedScript, process_word_emphasis
+
+SHORTCUTS = [
+    ("q / Q / Esc", "Quit immediately"),
+    ("r / R / 0 / Home", "Reload script & restart from word 0"),
+    ("Space", "Pause / resume auto-scrolling"),
+    ("Left / h / H / b / B", "Seek backward 5 words"),
+    ("Right / l / L / f / F", "Seek forward 5 words"),
+    ("/", "Search script (regex), Enter to jump, Esc to cancel"),
+    ("n / N", "Repeat last search forward / backward"),
+    ("p / P", "Toggle performance disk logging"),
+    ("d / D", "Toggle live latency debug header overlay"),
+    ("?", "Show/hide this shortcut reference"),
+]
 
 
 def append_styled_cue(header_text: Text, cue: str, is_new_cue: bool = False):
@@ -212,6 +226,24 @@ class TUIScroller:
 
     def render_text(self, current_index: int, is_paused: bool = False):
         return self.render(current_index, is_paused=is_paused)
+
+    def render_help(self) -> Group:
+        """
+        Renders a full-screen, dense keyboard shortcut reference that replaces
+        the script view. Caller is responsible for restoring the normal render
+        once the overlay is dismissed.
+        """
+        header_text = Text(" CLICUE SHORTCUTS ", style="bold black on bright_yellow")
+
+        table = Table(show_header=False, box=None, padding=(0, 2, 0, 0))
+        table.add_column(style="bold cyan", no_wrap=True)
+        table.add_column(style="white")
+        for key, desc in SHORTCUTS:
+            table.add_row(key, desc)
+
+        footer_text = Text("Press ? or Esc to close", style="dim italic")
+
+        return Group(header_text, Text(""), table, Text(""), footer_text)
 
     def display(self, current_index: int, is_paused: bool = False):
         self.console.clear()
